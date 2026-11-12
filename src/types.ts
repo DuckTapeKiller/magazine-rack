@@ -22,10 +22,14 @@ export interface Article {
 	summary?: string;
 	/** Picture from the feed itself. */
 	image?: string;
+	/** A thumbnail too small for a large card, used only when the article page offers no picture. */
+	thumbnail?: string;
 	/** The feed it came from, so a failed feed can keep its earlier articles. */
 	feed?: string;
 	/** When the plugin first saw it, for keeping a history of undated articles. */
 	firstSeen?: number;
+	/** The last check that found it in its feed: history is kept from then. */
+	lastSeen?: number;
 }
 
 /** An article put aside to read later; kept after it leaves the feed. */
@@ -69,6 +73,8 @@ export interface Settings {
 	/** How long articles stay on the page after they leave the feed. */
 	historyDays: number;
 	unreadOnly: boolean;
+	/** The row of magazine chips kept to one line, with a chip that shows the rest. */
+	chipsFolded: boolean;
 	language: Language;
 	/** Switch the note to reading view whenever it is opened. */
 	alwaysReading: boolean;
@@ -84,6 +90,8 @@ export interface PluginData {
 	cache: Record<string, MagazineCache>;
 	/** Sharing pictures read from article pages, by article URL; null when the page had none. */
 	pageImages: Record<string, string | null>;
+	/** How many times an article page gave no picture, so a page that failed once is tried again. */
+	pageMisses?: Record<string, number>;
 	/** Articles opened or marked read, most recent last. */
 	read: string[];
 	saved: SavedArticle[];
@@ -95,7 +103,20 @@ export interface PluginData {
 export const KOFI_URL = "https://ko-fi.com/ducktapekiller";
 
 /** Muted accents that hold up on light and dark themes. */
-export const PALETTE = ["#b5543a", "#2f6f8f", "#a23b3b", "#5b6470", "#9a7b2f", "#7a5c99", "#3f5f9e", "#3d7a5a"];
+export const PALETTE = [
+	"#b5543a",
+	"#2f6f8f",
+	"#a23b3b",
+	"#5b6470",
+	"#9a7b2f",
+	"#7a5c99",
+	"#3f5f9e",
+	"#3d7a5a",
+	"#8a4f7d",
+	"#4f7f86",
+	"#a0612b",
+	"#6b7a3a",
+];
 
 export const DEFAULT_MAGAZINES: Magazine[] = [
 	{
@@ -169,6 +190,168 @@ export const DEFAULT_MAGAZINES: Magazine[] = [
 		leaveOut: [],
 		color: PALETTE[6],
 	},
+	{
+		id: "guardian",
+		name: "The Guardian",
+		homepage: "https://www.theguardian.com",
+		feeds: ["https://www.theguardian.com/world/rss"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[7],
+	},
+	{
+		id: "le-monde",
+		name: "Le Monde",
+		homepage: "https://www.lemonde.fr",
+		feeds: ["https://www.lemonde.fr/rss/une.xml"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[8],
+	},
+	{
+		id: "el-pais",
+		name: "El País",
+		homepage: "https://elpais.com",
+		feeds: ["https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[9],
+	},
+	{
+		id: "el-espectador",
+		name: "El Espectador",
+		homepage: "https://www.elespectador.com",
+		feeds: ["https://www.elespectador.com/arc/outboundfeeds/discover/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[10],
+	},
+	{
+		id: "la-nacion",
+		name: "La Nación",
+		homepage: "https://www.lanacion.com.ar",
+		feeds: ["https://www.lanacion.com.ar/arc/outboundfeeds/rss/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[11],
+	},
+	{
+		id: "bbc",
+		name: "BBC",
+		homepage: "https://www.bbc.co.uk/news",
+		// The feed's pictures are 240-pixel thumbnails, so the article pages' pictures are used.
+		feeds: ["https://feeds.bbci.co.uk/news/rss.xml"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[0],
+	},
+	{
+		id: "epoch-times",
+		name: "Epoch Times",
+		homepage: "https://www.theepochtimes.com",
+		feeds: ["https://feed.theepochtimes.com/us/feed"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[1],
+	},
+	{
+		id: "psyche",
+		name: "Psyche",
+		homepage: "https://psyche.co",
+		feeds: ["https://psyche.co/feed"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[2],
+	},
+	{
+		id: "nature",
+		name: "Nature",
+		homepage: "https://www.nature.com",
+		feeds: ["https://www.nature.com/nature.rss"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[3],
+	},
+	{
+		id: "big-think",
+		name: "Big Think",
+		homepage: "https://bigthink.com",
+		feeds: ["https://bigthink.com/feed/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[4],
+	},
+	{
+		id: "noema",
+		name: "Noema",
+		homepage: "https://www.noemamag.com",
+		feeds: ["https://www.noemamag.com/feed/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[5],
+	},
+	{
+		id: "letras-libres",
+		name: "Letras Libres",
+		homepage: "https://letraslibres.com",
+		feeds: ["https://letraslibres.com/feed/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[6],
+	},
+	{
+		id: "zenda",
+		name: "Zenda",
+		homepage: "https://www.zendalibros.com",
+		feeds: ["https://www.zendalibros.com/feed/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[7],
+	},
+	{
+		id: "el-cultural",
+		name: "El Cultural",
+		homepage: "https://www.elespanol.com/el-cultural/",
+		feeds: ["https://www.elespanol.com/rss/el-cultural/"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[8],
+	},
+	{
+		id: "mcsweeneys",
+		name: "McSweeney’s",
+		homepage: "https://www.mcsweeneys.net",
+		feeds: ["https://feeds.feedburner.com/mcsweeneys"],
+		showAuthor: true,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[9],
+	},
+	{
+		id: "granta",
+		name: "Granta",
+		homepage: "https://granta.com",
+		// granta.com turns away anything that is not a browser; Granta's own Substack carries its new pieces. Its feed names the magazine, not the writer, as author.
+		feeds: ["https://grantamag.substack.com/feed"],
+		showAuthor: false,
+		enabled: true,
+		leaveOut: [],
+		color: PALETTE[10],
+	},
 ];
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -179,6 +362,7 @@ export const DEFAULT_SETTINGS: Settings = {
 	showSummaries: true,
 	historyDays: 7,
 	unreadOnly: false,
+	chipsFolded: true,
 	language: "en",
 	alwaysReading: true,
 	clipTemplates: [],

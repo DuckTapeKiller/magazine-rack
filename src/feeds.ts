@@ -50,7 +50,8 @@ export function parseFeed(text: string, feedUrl: string): Article[] {
 		const summary = summarise(childText(entry, "description", "summary", "content", "encoded"));
 		if (summary) article.summary = summary;
 		const image = entryImage(entry, url);
-		if (image) article.image = image;
+		if (image?.small) article.thumbnail = image.url;
+		else if (image) article.image = image.url;
 		articles.push(article);
 	}
 	return articles;
@@ -122,9 +123,14 @@ function entryLink(entry: Element, feedUrl: string): string | null {
 
 const MRSS = "search.yahoo.com/mrss";
 const NOT_PICTURES = /feedburner|gravatar|\/emoji\/|smilies|\/pixel\.|1x1|spacer\.|blank\.gif|\.svg(\?|$)/i;
+/** Narrower than this, a feed's picture is a thumbnail that would look blurred on a large card. */
+const SMALL_PICTURE = 300;
 
-/** The article's picture as the feed gives it: Media RSS, an image enclosure, or the first real <img>. */
-function entryImage(entry: Element, articleUrl: string): string | undefined {
+/**
+ * The article's picture as the feed gives it: Media RSS, an image enclosure, or the first real <img>.
+ * `small` marks a picture the feed says is narrower than SMALL_PICTURE (the BBC's are 240 pixels).
+ */
+function entryImage(entry: Element, articleUrl: string): { url: string; small: boolean } | undefined {
 	const media = Array.from(entry.getElementsByTagName("*")).filter((el) =>
 		(el.namespaceURI ?? "").includes(MRSS),
 	);
@@ -141,8 +147,13 @@ function entryImage(entry: Element, articleUrl: string): string | undefined {
 	const thumbnail = media.find((el) => el.localName === "thumbnail" && el.getAttribute("url"));
 	const enclosure = children(entry, "enclosure").find((el) => (el.getAttribute("type") ?? "").startsWith("image/"));
 
-	const fromFeed = contents[0]?.getAttribute("url") ?? thumbnail?.getAttribute("url") ?? enclosure?.getAttribute("url");
-	if (fromFeed) return absoluteImage(fromFeed, articleUrl);
+	const chosen = contents[0] ?? thumbnail ?? enclosure;
+	const fromFeed = chosen?.getAttribute("url");
+	if (chosen && fromFeed) {
+		const url = absoluteImage(fromFeed, articleUrl);
+		const width = Number(chosen.getAttribute("width"));
+		if (url) return { url, small: width > 0 && width < SMALL_PICTURE };
+	}
 
 	for (const html of [childText(entry, "description", "summary"), childText(entry, "encoded", "content")]) {
 		if (!html || !/<img/i.test(html)) continue;
@@ -152,7 +163,7 @@ function entryImage(entry: Element, articleUrl: string): string | undefined {
 			const tiny = Number(img.getAttribute("width") || 99) <= 2 || Number(img.getAttribute("height") || 99) <= 2;
 			if (!src || tiny || NOT_PICTURES.test(src)) continue;
 			const url = absoluteImage(src, articleUrl);
-			if (url) return url;
+			if (url) return { url, small: false };
 		}
 	}
 	return undefined;
@@ -200,6 +211,8 @@ function entryAuthor(entry: Element): string | undefined {
 	if (inBrackets) author = inBrackets[1];
 	if (/^\S+@\S+$/.test(author)) return undefined;
 	author = cleanText(author).replace(/^by\s+/i, "");
+	// Some feeds name the site, not the writer, as in "zendalibros.com".
+	if (/^(www\.)?[\w-]+(\.[\w-]+)*\.[a-z]{2,}$/i.test(author)) return undefined;
 	return author || undefined;
 }
 
@@ -275,9 +288,9 @@ export async function discoverFeeds(website: string): Promise<string[]> {
 			for (const link of Array.from(doc.querySelectorAll("link[rel~='alternate'][href]"))) {
 				const type = (link.getAttribute("type") ?? "").toLowerCase();
 				if (!/rss|atom|xml/.test(type)) continue;
-				const href = new URL(link.getAttribute("href") ?? "", base).toString();
+				const href = absoluteUrl(link.getAttribute("href") ?? "", base);
 				// Comment feeds are rarely what anyone wants.
-				if (!/comments/i.test(href)) candidates.push(href);
+				if (href && !/comments/i.test(href)) candidates.push(href);
 			}
 		}
 	} catch {
@@ -290,6 +303,16 @@ export async function discoverFeeds(website: string): Promise<string[]> {
 		usual.map((path) => new URL(path, base).toString()),
 		1,
 	);
+}
+
+/** A link the page gives, made absolute; null when it is not a web address, so one bad link does not stop the search. */
+function absoluteUrl(href: string, base: URL): string | null {
+	try {
+		const url = new URL(href, base);
+		return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+	} catch {
+		return null;
+	}
 }
 
 async function workingFeeds(urls: string[], limit: number): Promise<string[]> {

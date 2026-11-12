@@ -8,6 +8,14 @@
 	--file-line-width: 1240px;
 }
 
+/* Some themes size notes with a width of their own (Brutalist's --editor-width), so the page sets its sizer itself.
+   With readable line length switched off, the theme's full width stands. */
+.markdown-preview-view.is-readable-line-width.magazine-rack-page .markdown-preview-sizer,
+.markdown-source-view.mod-cm6.is-readable-line-width.magazine-rack-page .cm-sizer,
+.markdown-source-view.mod-cm6.is-readable-line-width.magazine-rack-page .cm-content {
+	max-width: 1240px;
+}
+
 .magazine-rack-page .inline-title,
 .markdown-preview-view.magazine-rack-page.show-properties .metadata-container,
 .markdown-source-view.is-live-preview.show-properties.magazine-rack-page .metadata-container {
@@ -21,7 +29,11 @@
 	--mr-muted: var(--text-muted);
 	--mr-faint: var(--text-faint);
 	--mr-rule: var(--background-modifier-border);
-	--mr-radius: 10px;
+	/* Corners follow the theme: Obsidian's radius variables, so a square theme gets square corners. */
+	--mr-radius: var(--radius-l);
+	--mr-radius-large: var(--radius-xl);
+	/* Pills (buttons, chips, tags, badges) round as the theme rounds its own tags and pills. */
+	--mr-pill: var(--pill-radius, var(--tag-radius, 2em));
 	container: mr / inline-size;
 	padding-bottom: 3em;
 	font-size: var(--font-text-size);
@@ -83,7 +95,7 @@
 	gap: 6px;
 	height: auto;
 	padding: 4px 11px;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	border: 1px solid var(--mr-rule);
 	background: transparent;
 	box-shadow: none;
@@ -116,6 +128,18 @@
 	animation: mr-spin 1s linear infinite;
 }
 
+/* The number of articles in the reading list, on its masthead button. */
+.mr-tool-count {
+	min-width: 1.5em;
+	padding: 0 0.4em;
+	border-radius: var(--mr-pill);
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: 700;
+	line-height: 1.5;
+	text-align: center;
+}
+
 @keyframes mr-spin {
 	to {
 		transform: rotate(360deg);
@@ -138,7 +162,7 @@
 	gap: 7px;
 	height: auto;
 	padding: 6px 13px;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	border: 1px solid var(--mr-rule);
 	background: var(--background-primary);
 	box-shadow: none;
@@ -163,19 +187,34 @@
 	color: var(--background-primary);
 }
 
-.mr-chip-icon {
+/* The chip that unfolds or folds the row. */
+.mr-page button.mr-chip.mr-chip-toggle {
+	gap: 4px;
+	color: var(--mr-faint);
+	border-style: dashed;
+}
+
+.mr-page button.mr-chip.mr-chip-toggle:hover {
+	color: var(--mr-ink);
+}
+
+.mr-chip-toggle-icon {
 	display: inline-flex;
 }
 
-.mr-chip-icon svg {
+.mr-chip-toggle-icon svg {
 	width: 13px;
 	height: 13px;
+}
+
+.mr-page button.mr-chip.is-hidden {
+	display: none;
 }
 
 .mr-chip-dot {
 	width: 8px;
 	height: 8px;
-	border-radius: 50%;
+	border-radius: var(--mr-pill);
 	background: var(--mr-accent);
 	flex: none;
 }
@@ -183,7 +222,7 @@
 .mr-chip-count {
 	min-width: 1.5em;
 	padding: 0 0.4em;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	background: var(--mr-accent);
 	color: #fff;
 	font-size: 0.85em;
@@ -305,7 +344,7 @@
 	position: absolute;
 	inset: clamp(5px, 4cqi, 12px);
 	border: 1px solid rgba(255, 255, 255, 0.35);
-	border-radius: 6px;
+	border-radius: var(--radius-s);
 }
 
 .mr-body {
@@ -333,7 +372,7 @@
 	max-width: calc(100% - 20px);
 	overflow: hidden;
 	padding: 0.32em 0.7em;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	background: var(--mr-accent);
 	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
 	color: #fff;
@@ -379,7 +418,7 @@
 	height: 30px;
 	padding: 0;
 	border: 0;
-	border-radius: 8px;
+	border-radius: var(--radius-m);
 	background: rgba(18, 18, 18, 0.62);
 	-webkit-backdrop-filter: blur(6px);
 	backdrop-filter: blur(6px);
@@ -471,7 +510,7 @@
 
 .mr-new {
 	padding: 0.2em 0.6em;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	background: var(--mr-accent);
 	color: #fff;
 	letter-spacing: 0.08em;
@@ -529,7 +568,7 @@
 .mr-read-mark {
 	display: none;
 	padding: 0.1em 0.55em;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	border: 1px solid var(--mr-rule);
 }
 
@@ -564,7 +603,7 @@
 /* The newest piece on the page */
 .mr-hero .mr-media {
 	aspect-ratio: 16 / 9;
-	border-radius: 14px;
+	border-radius: var(--mr-radius-large);
 }
 
 .mr-hero .mr-body {
@@ -605,7 +644,7 @@
 	flex: none;
 	width: 92px;
 	aspect-ratio: 1;
-	border-radius: 8px;
+	border-radius: var(--radius-m);
 }
 
 .mr-compact .mr-body {
@@ -668,17 +707,22 @@
 	height: 0.8em;
 }
 
+/* The reading list: a page of its own, with the way back above its heading. */
+.mr-page a.mr-back {
+	display: inline-block;
+	margin-bottom: 1.2em;
+	font: 600 0.8em/1.2 var(--mr-sans);
+	color: var(--interactive-accent);
+}
+
+.mr-page a.mr-back:hover {
+	text-decoration: underline;
+}
+
 .mr-quiet {
 	margin-bottom: 1em;
 	font: italic 0.92em/1.4 var(--mr-serif);
 	color: var(--mr-muted);
-}
-
-.mr-page a.mr-see-all {
-	display: inline-block;
-	margin-top: 1.2em;
-	font: 600 0.8em/1.2 var(--mr-sans);
-	color: var(--interactive-accent);
 }
 
 .mr-page a.mr-section-link:hover {
@@ -688,7 +732,7 @@
 .mr-warning {
 	margin-bottom: 1em;
 	padding: 0.6em 0.9em;
-	border-radius: 8px;
+	border-radius: var(--radius-m);
 	background: color-mix(in srgb, var(--text-warning) 10%, transparent);
 	color: var(--text-warning);
 	font: 0.82em/1.4 var(--mr-sans);
@@ -760,6 +804,11 @@
 		display: none;
 	}
 
+	/* The row already keeps to one line here and scrolls sideways, so there is nothing to fold. */
+	.mr-page button.mr-chip.mr-chip-toggle {
+		display: none;
+	}
+
 	.mr-grid {
 		grid-template-columns: minmax(0, 1fr);
 		gap: 0;
@@ -788,7 +837,7 @@
 		flex: none;
 		width: 96px;
 		aspect-ratio: 1;
-		border-radius: 8px;
+		border-radius: var(--radius-m);
 	}
 
 	.mr-grid .mr-card:not(.mr-feature) .mr-body {
@@ -855,14 +904,14 @@
 	}
 }
 
-/* The support heart: small and quiet in the masthead's corner, warmer on hover. */
+/* The support heart: small and quiet in the masthead's corner, with a slow, soft heartbeat; red on hover. */
 .mr-page a.mr-support {
 	position: absolute;
 	right: 2px;
 	bottom: 10px;
 	display: inline-flex;
 	padding: 4px;
-	border-radius: 999px;
+	border-radius: var(--mr-pill);
 	color: var(--mr-faint);
 	opacity: 0.45;
 	transition:
@@ -879,13 +928,69 @@
 .mr-support svg {
 	width: 14px;
 	height: 14px;
+	transform-origin: 50% 55%;
+	animation: mr-heartbeat 3.2s ease-in-out infinite;
 }
 
-.mr-page a.mr-support:hover svg {
+/* The heart brightens a little with each beat; the same timing as the beat, so the two stay together. */
+.mr-page a.mr-support:not(:hover, :focus-visible) {
+	animation: mr-heartglow 3.2s ease-in-out infinite;
+}
+
+.mr-page a.mr-support:hover svg,
+.mr-page a.mr-support:focus-visible svg {
 	fill: currentColor;
+	animation: none;
+}
+
+/* Two soft beats, then a long rest. */
+@keyframes mr-heartbeat {
+	0%,
+	14%,
+	34%,
+	100% {
+		transform: scale(1);
+	}
+
+	7% {
+		transform: scale(1.16);
+	}
+
+	21% {
+		transform: scale(1.1);
+	}
+}
+
+@keyframes mr-heartglow {
+	0%,
+	34%,
+	100% {
+		opacity: 0.45;
+	}
+
+	7%,
+	21% {
+		opacity: 0.8;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mr-support svg,
+	.mr-page a.mr-support:not(:hover, :focus-visible) {
+		animation: none;
+	}
 }
 
 /* ---------- Settings ---------- */
+
+/* A guide or note drawn in place of a setting's name and control. */
+.setting-item.magazine-rack-block-row {
+	display: block;
+}
+
+.magazine-rack-block-row .magazine-rack-guide {
+	margin: 0;
+}
 
 .setting-item.magazine-rack-support {
 	display: flex;
@@ -932,7 +1037,7 @@
 	align-items: center;
 	gap: var(--size-4-2);
 	padding: var(--size-4-2) var(--size-4-4);
-	border-radius: var(--radius-m);
+	border-radius: var(--button-radius);
 	background-color: var(--interactive-accent);
 	color: var(--text-on-accent);
 	font-weight: var(--font-semibold);
@@ -963,7 +1068,7 @@
 	width: 10px;
 	height: 10px;
 	margin-right: 8px;
-	border-radius: 50%;
+	border-radius: var(--pill-radius, var(--tag-radius, 2em));
 	background: var(--mr-accent);
 	vertical-align: middle;
 }

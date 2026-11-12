@@ -26,6 +26,8 @@ const DAY = 24 * 60 * 60 * 1000;
 const TICK_MS = 60_000;
 /** Article pages read at once when looking for pictures. */
 const PAGE_CONCURRENCY = 4;
+/** Checks at which an article page that gave no picture is read again; some sites fail now and then. */
+const PAGE_TRIES = 3;
 const MAX_LIST = 3000;
 export const PAGE_CLASS = "magazine-rack-page";
 const BLOCK = "```magazine-rack\n```";
@@ -40,6 +42,7 @@ export default class MagazineRack extends Plugin {
 	settings: Settings = copyDefaults();
 	cache: Record<string, MagazineCache> = {};
 	pageImages: Record<string, string | null> = {};
+	pageMisses: Record<string, number> = {};
 	saved: SavedArticle[] = [];
 	lastCheck: number | undefined;
 	readonly views = new Set<FrontPage>();
@@ -176,7 +179,7 @@ export default class MagazineRack extends Plugin {
 
 	/** A short message with an Undo link. */
 	notifyWithUndo(text: string, undo: () => void): void {
-		const fragment = document.createDocumentFragment();
+		const fragment = createFragment();
 		fragment.appendText(`${text} `);
 		const link = fragment.createEl("a", { text: this.t().undo, href: "#", cls: "mr-undo" });
 		const notice = new Notice(fragment, 7000);
@@ -196,7 +199,7 @@ export default class MagazineRack extends Plugin {
 		try {
 			const outcome = await clipArticle(this.app, article.url, this.settings.clipTemplates, template);
 			progress.hide();
-			const fragment = document.createDocumentFragment();
+			const fragment = createFragment();
 			fragment.appendText(`${t.clipped(outcome.file.path)} `);
 			const link = fragment.createEl("a", { text: t.open, href: "#", cls: "mr-undo" });
 			const done = new Notice(fragment, 8000);
@@ -233,16 +236,38 @@ export default class MagazineRack extends Plugin {
 		return this.running;
 	}
 
+	/**
+	 * Checks after a change in the settings (a magazine added, switched on or given new feeds).
+	 * A check already under way started before the change and would miss it, so this waits
+	 * for it to end and checks again.
+	 */
+	async recheck(): Promise<void> {
+		if (this.running) await this.running.catch(() => undefined);
+		await this.checkNow(false);
+	}
+
 	private async runCheck(manual: boolean): Promise<CheckResult> {
 		const t = this.t();
 		const progress = manual ? new Notice(t.checking, 0) : null;
+		// The message goes once the headlines are in, or when the check fails, so it is never left on screen.
+		try {
+			return await this.checkFeeds(manual, t, () => progress?.hide());
+		} finally {
+			progress?.hide();
+		}
+	}
+
+	private async checkFeeds(manual: boolean, t: Strings, headlinesIn: () => void): Promise<CheckResult> {
 		const magazines = this.settings.magazines.filter((m) => m.enabled);
+		const feedsAtStart = magazines.map((m) => m.feeds.join("\n"));
 		const now = Date.now();
 		const cutoff = now - this.settings.historyDays * DAY;
 		const outcomes = await Promise.all(magazines.map((m) => this.fetchMagazine(m)));
 
 		const result: CheckResult = { checked: magazines.length, failed: [], fresh: 0 };
 		magazines.forEach((magazine, i) => {
+			// Feeds edited while this check was reading the old ones: the next check reads the new ones.
+			if (magazine.feeds.join("\n") !== feedsAtStart[i]) return;
 			const outcome = outcomes[i];
 			const previous = this.cache[magazine.id];
 			if (outcome.articles) {
@@ -252,13 +277,14 @@ export default class MagazineRack extends Plugin {
 						.slice(0, this.settings.perMagazine)
 						.filter((a) => !known.has(a.url)).length;
 				}
+				// Articles kept from a feed that failed this time carry the last time they were seen.
 				const fromFeed = outcome.articles
 					.slice(0, FROM_FEED)
-					.map((a) => ({ ...a, firstSeen: known.get(a.url)?.firstSeen ?? now }));
-				// Articles that have left the feed stay for the chosen number of days.
+					.map((a) => ({ ...a, firstSeen: known.get(a.url)?.firstSeen ?? now, lastSeen: a.lastSeen ?? now }));
+				// Articles that have left the feed stay for the chosen number of days after they left it.
 				const inFeed = new Set(fromFeed.map((a) => a.url));
 				const history = (previous?.articles ?? []).filter(
-					(a) => !inFeed.has(a.url) && (a.date ?? a.firstSeen ?? 0) >= cutoff,
+					(a) => !inFeed.has(a.url) && (a.lastSeen ?? a.date ?? a.firstSeen ?? 0) >= cutoff,
 				);
 				this.cache[magazine.id] = {
 					articles: sortArticles([...fromFeed, ...history], true).slice(0, KEEP_MAX),
@@ -279,7 +305,7 @@ export default class MagazineRack extends Plugin {
 
 		this.lastCheck = now;
 		await this.savePluginData();
-		progress?.hide();
+		headlinesIn();
 		if (manual) {
 			const parts = [t.newArticles(result.fresh)];
 			if (result.failed.length) parts.push(t.couldNotReach(result.failed.join(", ")));
@@ -322,8 +348,10 @@ export default class MagazineRack extends Plugin {
 		const wanted: string[] = [];
 		const kept = new Set<string>();
 		const consider = (article: Article) => {
-			kept.add(article.url);
-			if (!article.image && !(article.url in this.pageImages)) wanted.push(article.url);
+			const url = article.url;
+			kept.add(url);
+			if (article.image || this.pageImages[url]) return;
+			if (!(url in this.pageImages) || (this.pageMisses[url] ?? 0) < PAGE_TRIES) wanted.push(url);
 		};
 		for (const magazine of this.settings.magazines) {
 			for (const article of this.cache[magazine.id]?.articles ?? []) consider(article);
@@ -331,6 +359,7 @@ export default class MagazineRack extends Plugin {
 		for (const entry of this.saved) consider(entry.article);
 		// Forget pictures of articles that are no longer kept anywhere.
 		for (const url of Object.keys(this.pageImages)) if (!kept.has(url)) delete this.pageImages[url];
+		for (const url of Object.keys(this.pageMisses)) if (!kept.has(url)) delete this.pageMisses[url];
 		if (!wanted.length) return;
 
 		let found = 0;
@@ -338,12 +367,19 @@ export default class MagazineRack extends Plugin {
 		const worker = async () => {
 			while (next < wanted.length) {
 				const url = wanted[next++];
+				let picture: string | null = null;
 				try {
-					this.pageImages[url] = await fetchPageImage(url);
-					// Redraw every few pictures so they appear while the rest load.
-					if (this.pageImages[url] && ++found % 6 === 0) this.refreshViews();
+					picture = await fetchPageImage(url);
 				} catch {
-					this.pageImages[url] = null;
+					// No answer this time: counted as a miss, and tried again at the next check.
+				}
+				this.pageImages[url] = picture;
+				if (picture) {
+					delete this.pageMisses[url];
+					// Redraw every few pictures so they appear while the rest load.
+					if (++found % 6 === 0) this.refreshViews();
+				} else {
+					this.pageMisses[url] = (this.pageMisses[url] ?? 0) + 1;
 				}
 			}
 		};
@@ -435,12 +471,14 @@ export default class MagazineRack extends Plugin {
 			...defaults,
 			...saved,
 			language: saved.language === "es" ? "es" : "en",
+			chipsFolded: saved.chipsFolded !== false,
 			historyDays: Number.isFinite(saved.historyDays) ? Math.max(0, Number(saved.historyDays)) : defaults.historyDays,
 			clipTemplates: Array.isArray(saved.clipTemplates) ? saved.clipTemplates : [],
 			magazines: Array.isArray(saved.magazines) ? saved.magazines.map(cleanMagazine) : defaults.magazines,
 		};
 		this.cache = raw?.cache && typeof raw.cache === "object" ? raw.cache : {};
 		this.pageImages = raw?.pageImages && typeof raw.pageImages === "object" ? raw.pageImages : {};
+		this.pageMisses = raw?.pageMisses && typeof raw.pageMisses === "object" ? raw.pageMisses : {};
 		const read = raw?.read;
 		this.read = new Set(Array.isArray(read) ? read.map(String) : []);
 		const removed = raw?.removed;
@@ -457,6 +495,7 @@ export default class MagazineRack extends Plugin {
 			settings: this.settings,
 			cache: this.cache,
 			pageImages: this.pageImages,
+			pageMisses: this.pageMisses,
 			read: Array.from(this.read).slice(-MAX_LIST),
 			saved: this.saved,
 			removed: Array.from(this.removed).slice(-MAX_LIST),

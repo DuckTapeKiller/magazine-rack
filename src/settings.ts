@@ -1,9 +1,18 @@
-import { App, Modal, Notice, PluginSettingTab, Setting, setIcon } from "obsidian";
+import {
+	App,
+	Modal,
+	Notice,
+	PluginSettingTab,
+	Setting,
+	requireApiVersion,
+	setIcon,
+	type SettingDefinitionItem,
+} from "obsidian";
 import { fallbackTemplate, parseTemplates } from "./clip";
 import { discoverFeeds, fetchFeed } from "./feeds";
 import type MagazineRack from "./main";
 import { formatStamp } from "./view";
-import { DEFAULT_CLIP_TEMPLATE, KOFI_URL, PALETTE, copyDefaults, type ClipTemplate, type Magazine } from "./types";
+import { DEFAULT_CLIP_TEMPLATE, DEFAULT_SETTINGS, KOFI_URL, PALETTE, copyDefaults, type ClipTemplate, type Magazine } from "./types";
 
 const INTERVALS: Record<string, string> = {
 	"15": "Every 15 minutes",
@@ -14,6 +23,21 @@ const INTERVALS: Record<string, string> = {
 	"720": "Every 12 hours",
 };
 
+/** One row of the settings, drawn the same way by both ways of showing them. */
+interface Row {
+	name: string;
+	/** Plain text: shown under the name, and searched in Obsidian 1.13 and later. */
+	desc?: string;
+	searchable?: boolean;
+	render: (setting: Setting) => void;
+}
+
+/** Rows under one heading. */
+interface Section {
+	heading?: string;
+	rows: Row[];
+}
+
 export class MagazineRackSettingTab extends PluginSettingTab {
 	constructor(
 		app: App,
@@ -22,301 +46,391 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 		super(app, plugin);
 	}
 
-	display(): void {
-		const { containerEl } = this;
-		const settings = this.plugin.settings;
-		containerEl.empty();
+	// ---------- Obsidian 1.13 and later: Obsidian draws the rows, and can search them ----------
 
-		new Setting(containerEl)
-			.setName("Note")
-			.setDesc(
-				"Where the reading room lives. The note is made the first time you open it. In a note you already have, the page is added at the end and the rest is left alone. You can also put a magazine-rack code block in any note.",
-			)
-			.addText((text) =>
-				text
-					.setPlaceholder("Reading Room.md")
-					.setValue(settings.notePath)
-					.onChange(async (value) => {
-						settings.notePath = value;
-						await this.plugin.savePluginData();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Page title")
-			.setDesc("The name across the top of the page.")
-			.addText((text) =>
-				text
-					.setPlaceholder("The Reading Room")
-					.setValue(settings.title)
-					.onChange(async (value) => {
-						settings.title = value;
-						await this.plugin.savePluginData();
-						this.plugin.refreshViews();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Articles per magazine")
-			.addSlider((slider) =>
-				slider
-					.setLimits(3, 30, 1)
-					.setValue(settings.perMagazine)
-					.setDynamicTooltip()
-					.onChange(async (value) => {
-						settings.perMagazine = value;
-						await this.plugin.savePluginData();
-						this.plugin.refreshViews();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Check for new articles")
-			.setDesc("Only while Obsidian is open. It also checks when Obsidian starts, if the last check is older than this.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions(INTERVALS)
-					.setValue(String(settings.refreshMinutes))
-					.onChange(async (value) => {
-						settings.refreshMinutes = Number(value);
-						await this.plugin.savePluginData();
-						this.plugin.refreshViews();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Show standfirsts")
-			.setDesc("The short introduction under each headline, where the feed gives one.")
-			.addToggle((toggle) =>
-				toggle.setValue(settings.showSummaries).onChange(async (value) => {
-					settings.showSummaries = value;
-					await this.plugin.savePluginData();
-					this.plugin.refreshViews();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Keep articles for")
-			.setDesc("Feeds only hold their newest pieces, so an article can vanish within hours. This keeps it on the page for a while after it leaves the feed.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions({
-						"0": "Only while it is in the feed",
-						"1": "1 day",
-						"3": "3 days",
-						"7": "A week",
-						"14": "Two weeks",
-						"30": "A month",
-					})
-					.setValue(String(settings.historyDays))
-					.onChange(async (value) => {
-						settings.historyDays = Number(value);
-						await this.plugin.savePluginData();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Language of the page")
-			.setDesc("For the dates, labels and menus on the page. These settings stay in English.")
-			.addDropdown((dropdown) =>
-				dropdown
-					.addOptions({ en: "English", es: "Español" })
-					.setValue(settings.language)
-					.onChange(async (value) => {
-						settings.language = value === "es" ? "es" : "en";
-						await this.plugin.savePluginData();
-						this.plugin.refreshViews();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Always open in reading view")
-			.setDesc("Switches the note to reading view each time you open it. If you switch to editing on purpose, it stays that way until you open the note again.")
-			.addToggle((toggle) =>
-				toggle.setValue(settings.alwaysReading).onChange(async (value) => {
-					settings.alwaysReading = value;
-					await this.plugin.savePluginData();
-				}),
-			);
-
-		new Setting(containerEl)
-			.setName("Check now")
-			.setDesc(
-				this.plugin.lastCheck
-					? `Last checked ${formatStamp(this.plugin.lastCheck)}.`
-					: "Not checked yet.",
-			)
-			.addButton((button) =>
-				button
-					.setButtonText("Check now")
-					.setCta()
-					.onClick(async () => {
-						button.setDisabled(true).setButtonText("Checking…");
-						await this.plugin.checkNow(true);
-						this.display();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Open the note").onClick(async () => {
-					await this.plugin.openNote();
-				}),
-			);
-
-		new Setting(containerEl).setName("Magazines").setHeading();
-		this.guide(containerEl);
-
-		settings.magazines.forEach((magazine, index) => {
-			const row = new Setting(containerEl).setName(magazine.name).setDesc(this.describe(magazine));
-			row.descEl.addClass("magazine-rack-desc");
-			const dot = createSpan({ cls: "magazine-rack-swatch" });
-			dot.style.setProperty("--mr-accent", magazine.color);
-			row.nameEl.prepend(dot);
-			row.addToggle((toggle) =>
-				toggle
-					.setTooltip("Show in the note")
-					.setValue(magazine.enabled)
-					.onChange(async (value) => {
-						magazine.enabled = value;
-						await this.plugin.savePluginData();
-						if (value && !this.plugin.cache[magazine.id]) await this.plugin.checkNow(false);
-						else this.plugin.refreshViews();
-						this.display();
-					}),
-			)
-				.addExtraButton((button) =>
-					button
-						.setIcon("arrow-up")
-						.setTooltip("Move up")
-						.setDisabled(index === 0)
-						.onClick(() => void this.move(index, -1)),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("arrow-down")
-						.setTooltip("Move down")
-						.setDisabled(index === settings.magazines.length - 1)
-						.onClick(() => void this.move(index, 1)),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("pencil")
-						.setTooltip("Edit")
-						.onClick(() => {
-							new MagazineModal(this.app, magazine, async (edited) => {
-								const feedsChanged = edited.feeds.join("\n") !== magazine.feeds.join("\n");
-								Object.assign(magazine, edited);
-								if (feedsChanged) delete this.plugin.cache[magazine.id];
-								await this.plugin.savePluginData();
-								if (feedsChanged) await this.plugin.checkNow(false);
-								else this.plugin.refreshViews();
-								this.display();
-							}).open();
-						}),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("trash")
-						.setTooltip("Remove")
-						.onClick(() => {
-							new ConfirmModal(this.app, `Remove ${magazine.name} from the list?`, "Remove", async () => {
-								settings.magazines.splice(settings.magazines.indexOf(magazine), 1);
-								delete this.plugin.cache[magazine.id];
-								await this.plugin.savePluginData();
-								this.plugin.refreshViews();
-								this.display();
-							}).open();
-						}),
-				);
-		});
-
-		const actions = new Setting(containerEl).addButton((button) =>
-			button.setButtonText("Add a magazine").onClick(() => {
-				new MagazineModal(
-					this.app,
-					null,
-					async (added) => {
-						settings.magazines.push(added);
-						await this.plugin.savePluginData();
-						await this.plugin.checkNow(false);
-						this.display();
-					},
-					PALETTE[settings.magazines.length % PALETTE.length],
-				).open();
-			}),
-		);
-		const ids = new Set(settings.magazines.map((m) => m.id));
-		const missing = copyDefaults().magazines.filter((m) => !ids.has(m.id));
-		if (missing.length) {
-			actions.addButton((button) =>
-				button.setButtonText(`Add back the original ${missing.length === 1 ? "magazine" : "magazines"}`).onClick(async () => {
-					settings.magazines.push(...missing);
-					await this.plugin.savePluginData();
-					await this.plugin.checkNow(false);
-					this.display();
-				}),
-			);
-		}
-
-		this.clipSection(containerEl);
-		this.supportSection(containerEl);
+	getSettingDefinitions(): SettingDefinitionItem[] {
+		return this.sections().map((section) => ({
+			type: "group",
+			heading: section.heading,
+			items: section.rows.map((row) => ({
+				name: row.name,
+				desc: row.desc,
+				searchable: row.searchable,
+				render: (setting: Setting) => this.draw(setting, row),
+			})),
+		}));
 	}
 
-	/** Support, laid out as in DuckTapeKiller's other plugins. */
-	private supportSection(containerEl: HTMLElement): void {
-		const name = this.plugin.manifest.name;
-		new Setting(containerEl).setName("Support").setHeading();
-		const el = containerEl.createDiv({ cls: "setting-item magazine-rack-support" });
-		setIcon(el.createDiv({ cls: "magazine-rack-support-icon" }), "heart");
-		const text = el.createDiv({ cls: "magazine-rack-support-text" });
-		text.createDiv({ cls: "magazine-rack-support-title", text: `Enjoying ${name}?` });
-		const about = text.createEl("p", {
-			text: `${name} is free and open source, made and maintained by DuckTapeKiller. If it is useful to you, you can support its development on `,
+	/** Draws the settings again after a change to what they show. */
+	refresh(): void {
+		if (requireApiVersion("1.13.0")) {
+			this.update();
+		} else if (this.containerEl.isShown()) {
+			this.drawAll();
+		}
+	}
+
+	// ---------- before Obsidian 1.13, which calls display() ----------
+
+	display(): void {
+		this.drawAll();
+	}
+
+	private drawAll(): void {
+		const { containerEl } = this;
+		containerEl.empty();
+		for (const section of this.sections()) {
+			if (section.heading) new Setting(containerEl).setName(section.heading).setHeading();
+			for (const row of section.rows) this.draw(new Setting(containerEl), row);
+		}
+	}
+
+	private draw(setting: Setting, row: Row): void {
+		if (row.name) setting.setName(row.name);
+		if (row.desc) setting.setDesc(row.desc);
+		row.render(setting);
+	}
+
+	// ---------- the rows ----------
+
+	private sections(): Section[] {
+		return [
+			{ rows: this.generalRows() },
+			{ heading: "Magazines", rows: this.magazineRows() },
+			{ heading: "Clip to vault", rows: this.clipRows() },
+			{ heading: "Support", rows: [this.supportRow()] },
+		];
+	}
+
+	private generalRows(): Row[] {
+		const settings = this.plugin.settings;
+		return [
+			{
+				name: "Note",
+				desc: "Where the reading room lives. The note is made the first time you open it. In a note you already have, the page is added at the end and the rest is left alone. You can also put a magazine-rack code block in any note.",
+				render: (setting) =>
+					setting.addText((text) =>
+						text
+							.setPlaceholder(DEFAULT_SETTINGS.notePath)
+							.setValue(settings.notePath)
+							.onChange(async (value) => {
+								settings.notePath = value;
+								await this.plugin.savePluginData();
+							}),
+					),
+			},
+			{
+				name: "Page title",
+				desc: "The name across the top of the page.",
+				render: (setting) =>
+					setting.addText((text) =>
+						text
+							.setPlaceholder(DEFAULT_SETTINGS.title)
+							.setValue(settings.title)
+							.onChange(async (value) => {
+								settings.title = value;
+								await this.plugin.savePluginData();
+								this.plugin.refreshViews();
+							}),
+					),
+			},
+			{
+				name: "Articles per magazine",
+				render: (setting) => {
+					// Obsidian 1.13 and later show a slider's value beside it; before that, the description does.
+					const showValue = (value: number) => {
+						if (!requireApiVersion("1.13.0")) setting.setDesc(String(value));
+					};
+					showValue(settings.perMagazine);
+					setting.addSlider((slider) =>
+						slider
+							.setLimits(3, 30, 1)
+							.setValue(settings.perMagazine)
+							.onChange(async (value) => {
+								settings.perMagazine = value;
+								showValue(value);
+								await this.plugin.savePluginData();
+								this.plugin.refreshViews();
+							}),
+					);
+				},
+			},
+			{
+				name: "Check for new articles",
+				desc: "Only while Obsidian is open. It also checks when Obsidian starts, if the last check is older than this.",
+				render: (setting) =>
+					setting.addDropdown((dropdown) =>
+						dropdown
+							.addOptions(INTERVALS)
+							.setValue(String(settings.refreshMinutes))
+							.onChange(async (value) => {
+								settings.refreshMinutes = Number(value);
+								await this.plugin.savePluginData();
+								this.plugin.refreshViews();
+							}),
+					),
+			},
+			{
+				name: "Show standfirsts",
+				desc: "The short introduction under each headline, where the feed gives one.",
+				render: (setting) =>
+					setting.addToggle((toggle) =>
+						toggle.setValue(settings.showSummaries).onChange(async (value) => {
+							settings.showSummaries = value;
+							await this.plugin.savePluginData();
+							this.plugin.refreshViews();
+						}),
+					),
+			},
+			{
+				name: "Keep articles for",
+				desc: "Feeds only hold their newest pieces, so an article can vanish within hours. This keeps it on the page for a while after it leaves the feed.",
+				render: (setting) =>
+					setting.addDropdown((dropdown) =>
+						dropdown
+							.addOptions({
+								"0": "Only while it is in the feed",
+								"1": "1 day",
+								"3": "3 days",
+								"7": "A week",
+								"14": "Two weeks",
+								"30": "A month",
+							})
+							.setValue(String(settings.historyDays))
+							.onChange(async (value) => {
+								settings.historyDays = Number(value);
+								await this.plugin.savePluginData();
+							}),
+					),
+			},
+			{
+				name: "Language of the page",
+				desc: "For the dates, labels and menus on the page. These settings stay in English.",
+				render: (setting) =>
+					setting.addDropdown((dropdown) =>
+						dropdown
+							.addOptions({ en: "English", es: "Español" })
+							.setValue(settings.language)
+							.onChange(async (value) => {
+								settings.language = value === "es" ? "es" : "en";
+								await this.plugin.savePluginData();
+								this.plugin.refreshViews();
+							}),
+					),
+			},
+			{
+				name: "Always open in reading view",
+				desc: "Switches the note to reading view each time you open it. If you switch to editing on purpose, it stays that way until you open the note again.",
+				render: (setting) =>
+					setting.addToggle((toggle) =>
+						toggle.setValue(settings.alwaysReading).onChange(async (value) => {
+							settings.alwaysReading = value;
+							await this.plugin.savePluginData();
+						}),
+					),
+			},
+			{
+				name: "Check now",
+				desc: this.plugin.lastCheck ? `Last checked ${formatStamp(this.plugin.lastCheck)}.` : "Not checked yet.",
+				render: (setting) =>
+					setting
+						.addButton((button) =>
+							button
+								.setButtonText("Check now")
+								.setCta()
+								.onClick(async () => {
+									button.setDisabled(true).setButtonText("Checking…");
+									await this.plugin.checkNow(true);
+									this.refresh();
+								}),
+						)
+						.addButton((button) =>
+							button.setButtonText("Open the note").onClick(async () => {
+								await this.plugin.openNote();
+							}),
+						),
+			},
+		];
+	}
+
+	private magazineRows(): Row[] {
+		const settings = this.plugin.settings;
+		const rows: Row[] = [this.magazineGuide()];
+
+		settings.magazines.forEach((magazine, index) => {
+			rows.push({
+				name: magazine.name,
+				desc: this.status(magazine),
+				render: (setting) => {
+					setting.setDesc(this.describe(magazine));
+					setting.descEl.addClass("magazine-rack-desc");
+					const dot = createSpan({ cls: "magazine-rack-swatch" });
+					dot.style.setProperty("--mr-accent", magazine.color);
+					setting.nameEl.prepend(dot);
+					setting
+						.addToggle((toggle) =>
+							toggle
+								.setTooltip("Show in the note")
+								.setValue(magazine.enabled)
+								.onChange(async (value) => {
+									magazine.enabled = value;
+									await this.afterChange(value && !this.plugin.cache[magazine.id]);
+								}),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("arrow-up")
+								.setTooltip("Move up")
+								.setDisabled(index === 0)
+								.onClick(() => void this.move(index, -1)),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("arrow-down")
+								.setTooltip("Move down")
+								.setDisabled(index === settings.magazines.length - 1)
+								.onClick(() => void this.move(index, 1)),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("pencil")
+								.setTooltip("Edit")
+								.onClick(() => {
+									new MagazineModal(this.app, magazine, async (edited) => {
+										const feedsChanged = edited.feeds.join("\n") !== magazine.feeds.join("\n");
+										Object.assign(magazine, edited);
+										if (feedsChanged) delete this.plugin.cache[magazine.id];
+										await this.afterChange(feedsChanged);
+									}).open();
+								}),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("trash")
+								.setTooltip("Remove")
+								.onClick(() => {
+									new ConfirmModal(this.app, `Remove ${magazine.name} from the list?`, "Remove", async () => {
+										settings.magazines.splice(settings.magazines.indexOf(magazine), 1);
+										delete this.plugin.cache[magazine.id];
+										await this.afterChange(false);
+									}).open();
+								}),
+						);
+				},
+			});
 		});
-		// The name stays on one line, so a narrow screen never breaks it at its hyphen.
-		about.createSpan({ cls: "magazine-rack-support-nowrap", text: "Ko-fi" });
-		about.appendText(".");
-		const kofi = el.createEl("a", {
-			cls: "magazine-rack-support-button",
-			href: KOFI_URL,
-			attr: { "aria-label": "Support DuckTapeKiller on Ko-fi" },
+
+		const ids = new Set(settings.magazines.map((m) => m.id));
+		const missing = copyDefaults().magazines.filter((m) => !ids.has(m.id));
+		rows.push({
+			name: "",
+			searchable: false,
+			render: (setting) => {
+				setting.addButton((button) =>
+					button.setButtonText("Add a magazine").onClick(() => {
+						new MagazineModal(
+							this.app,
+							null,
+							async (added) => {
+								settings.magazines.push(added);
+								await this.afterChange(true);
+							},
+							PALETTE[settings.magazines.length % PALETTE.length],
+						).open();
+					}),
+				);
+				if (missing.length) {
+					setting.addButton((button) =>
+						button
+							.setButtonText(`Add back the original ${missing.length === 1 ? "magazine" : "magazines"}`)
+							.onClick(async () => {
+								settings.magazines.push(...missing);
+								await this.afterChange(true);
+							}),
+					);
+				}
+			},
 		});
-		setIcon(kofi.createSpan({ cls: "magazine-rack-support-button-icon" }), "coffee");
-		kofi.createSpan({ text: "Support on Ko-fi" });
+		return rows;
+	}
+
+	/** A short how-to for adding a magazine, shown above the list. */
+	private magazineGuide(): Row {
+		return {
+			name: "Adding a magazine or any other source",
+			render: (setting) => {
+				const box = blockRow(setting);
+				box.createDiv({ cls: "magazine-rack-guide-title", text: "Adding a magazine or any other source" });
+				box.createEl("p", {
+					text: "The page reads RSS or Atom feeds, which almost every magazine, newspaper, journal and blog publishes, even when it does not advertise one.",
+				});
+				const steps = box.createEl("ol");
+				const step = (strong: string, rest: string) => {
+					const li = steps.createEl("li");
+					li.createEl("strong", { text: strong });
+					li.appendText(` ${rest}`);
+				};
+				step("Add a magazine,", "then type its name and its website address, for example https://www.lrb.co.uk.");
+				step("Find the feed.", "The button looks for the feed the site announces and for the usual addresses.");
+				step(
+					"If nothing is found,",
+					"search the web for the magazine’s name followed by “RSS feed”, or try the website address followed by /feed, /rss or /rss.xml. Paste what you find into Feeds. A section of a site often has its own feed; put several on separate lines and they are merged.",
+				);
+				step(
+					"Test the feeds.",
+					"Each address should report how many articles it holds and its newest headline. “Sent a web page” means that address is not a feed; try another.",
+				);
+				step("Save.", "The magazine appears on the page a few seconds later, with its own colour.");
+				const note = box.createEl("p", {
+					cls: "magazine-rack-guide-note",
+					text: "If every article shows the same name as author, the feed is naming its editor: switch off ",
+				});
+				note.createEl("em", { text: "Show authors" });
+				note.appendText(". Paywalled magazines work too; the page links to the article and you read it with your own subscription.");
+			},
+		};
 	}
 
 	/** Clipping articles with Web Clipper templates. */
-	private clipSection(containerEl: HTMLElement): void {
+	private clipRows(): Row[] {
 		const settings = this.plugin.settings;
-		new Setting(containerEl).setName("Clip to vault").setHeading();
-
-		const box = containerEl.createDiv({ cls: "magazine-rack-guide" });
-		box.createEl("p", {
-			text: "The scissors on each article (or Clip to vault in its menu) save the article as a note, using your Obsidian Web Clipper templates: the same folder, note name, properties and content as in your browser.",
-		});
-		const steps = box.createEl("ol");
-		const step = (strong: string, rest: string) => {
-			const li = steps.createEl("li");
-			li.createEl("strong", { text: strong });
-			li.appendText(` ${rest}`);
-		};
-		step("Export a template from Web Clipper:", "open its settings, choose the template, then Export (or More → Copy to clipboard).");
-		step(
-			"Import it here",
-			"with the button below, or paste it. You can import several: each one’s triggers choose it by web address, as in Web Clipper. When none match, the first template without triggers is used, or Web Clipper’s default.",
-		);
-		box.createEl("p", {
-			cls: "magazine-rack-guide-note",
-			text: "The article is read without your browser’s sign-in, so paywalled magazines may give only the first paragraphs; for those, open the article and use Web Clipper in your browser. Interpreter prompts are left empty, and anything a page draws with scripts after it loads (some prices, for example) may be missing.",
-		});
-
 		const templates = settings.clipTemplates;
 		const fallback = fallbackTemplate(templates);
+		const rows: Row[] = [
+			{
+				name: "Clipping with your Web Clipper templates",
+				render: (setting) => {
+					const box = blockRow(setting);
+					const intro = box.createEl("p", { text: "The scissors on each article (or " });
+					intro.createEl("em", { text: "Clip to vault" });
+					intro.appendText(
+						" in its menu) save the article as a note, using your Obsidian Web Clipper templates: the same folder, note name, properties and content as in your browser.",
+					);
+					const steps = box.createEl("ol");
+					const step = (strong: string, rest: string) => {
+						const li = steps.createEl("li");
+						li.createEl("strong", { text: strong });
+						li.appendText(` ${rest}`);
+					};
+					step("Export a template from Web Clipper:", "open its settings, choose the template, then Export (or More → Copy to clipboard).");
+					step(
+						"Import it here",
+						"with the button below, or paste it. You can import several: each one’s triggers choose it by web address, as in Web Clipper. When none match, the first template without triggers is used, or Web Clipper’s default.",
+					);
+					box.createEl("p", {
+						cls: "magazine-rack-guide-note",
+						text: "The article is read without your browser’s sign-in, so paywalled magazines may give only the first paragraphs; for those, open the article and use Web Clipper in your browser. Interpreter prompts are left empty, and anything a page draws with scripts after it loads (some prices, for example) may be missing.",
+					});
+				},
+			},
+		];
+
 		if (fallback === DEFAULT_CLIP_TEMPLATE) {
-			new Setting(containerEl)
-				.setName(`${DEFAULT_CLIP_TEMPLATE.name} (used when no trigger matches)`)
-				.setDesc(
-					`Folder: ${DEFAULT_CLIP_TEMPLATE.path}. Title, source, author, published, created, description and tags. Import a template without triggers to use your own instead.`,
-				);
+			rows.push({
+				name: `${DEFAULT_CLIP_TEMPLATE.name} (used when no trigger matches)`,
+				desc: `Folder: ${DEFAULT_CLIP_TEMPLATE.path}. Title, source, author, published, created, description and tags. Import a template without triggers to use your own instead.`,
+				render: () => undefined,
+			});
 		}
 		templates.forEach((template, index) => {
 			const where =
@@ -324,67 +438,128 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 					? "Adds to today's daily note"
 					: `Folder: ${template.path || "the vault's top level"}`;
 			const triggers = template.triggers?.length ? ` · Triggers: ${template.triggers.join(", ")}` : "";
-			new Setting(containerEl)
-				.setName(template === fallback ? `${template.name} (used when no trigger matches)` : template.name)
-				.setDesc(`${where}${triggers}`)
-				.addExtraButton((button) =>
-					button
-						.setIcon("arrow-up")
-						.setTooltip("Move up")
-						.setDisabled(index === 0)
-						.onClick(() => void this.moveTemplate(index, -1)),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("arrow-down")
-						.setTooltip("Move down")
-						.setDisabled(index === templates.length - 1)
-						.onClick(() => void this.moveTemplate(index, 1)),
-				)
-				.addExtraButton((button) =>
-					button
-						.setIcon("trash")
-						.setTooltip("Remove")
-						.onClick(() => {
-							new ConfirmModal(this.app, `Remove the template “${template.name}”?`, "Remove", async () => {
-								templates.splice(templates.indexOf(template), 1);
-								await this.plugin.savePluginData();
-								this.display();
-							}).open();
-						}),
-				);
+			rows.push({
+				name: template === fallback ? `${template.name} (used when no trigger matches)` : template.name,
+				desc: `${where}${triggers}`,
+				render: (setting) =>
+					setting
+						.addExtraButton((button) =>
+							button
+								.setIcon("arrow-up")
+								.setTooltip("Move up")
+								.setDisabled(index === 0)
+								.onClick(() => void this.moveTemplate(index, -1)),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("arrow-down")
+								.setTooltip("Move down")
+								.setDisabled(index === templates.length - 1)
+								.onClick(() => void this.moveTemplate(index, 1)),
+						)
+						.addExtraButton((button) =>
+							button
+								.setIcon("trash")
+								.setTooltip("Remove")
+								.onClick(() => {
+									new ConfirmModal(this.app, `Remove the template “${template.name}”?`, "Remove", async () => {
+										templates.splice(templates.indexOf(template), 1);
+										await this.plugin.savePluginData();
+										this.refresh();
+									}).open();
+								}),
+						),
+			});
 		});
 
-		new Setting(containerEl)
-			.addButton((button) =>
-				button
-					.setButtonText("Import templates…")
-					.setCta()
-					.onClick(() => {
-						const input = createEl("input", { attr: { type: "file", accept: ".json,application/json", multiple: "" } });
-						input.addEventListener("change", async () => {
-							const files = Array.from(input.files ?? []);
-							const texts = await Promise.all(files.map((file) => file.text()));
-							await this.importTemplates(texts);
-						});
-						input.click();
-					}),
-			)
-			.addButton((button) =>
-				button.setButtonText("Paste a template").onClick(() => {
-					new PasteModal(this.app, async (text) => this.importTemplates([text])).open();
-				}),
-			);
+		rows.push(
+			{
+				name: "",
+				searchable: false,
+				render: (setting) =>
+					setting
+						.addButton((button) =>
+							button
+								.setButtonText("Import templates…")
+								.setCta()
+								.onClick(() => {
+									const input = createEl("input", {
+										attr: { type: "file", accept: ".json,application/json", multiple: "" },
+									});
+									input.addEventListener("change", () => void this.importFiles(input));
+									input.click();
+								}),
+						)
+						.addButton((button) =>
+							button.setButtonText("Paste a template").onClick(() => {
+								new PasteModal(this.app, async (text) => this.importTemplates([text])).open();
+							}),
+						),
+			},
+			{
+				name: "Open the note after clipping",
+				desc: "Opens the new note in a new tab. Otherwise a message says where it went, with a link to open it.",
+				render: (setting) =>
+					setting.addToggle((toggle) =>
+						toggle.setValue(settings.openAfterClip).onChange(async (value) => {
+							settings.openAfterClip = value;
+							await this.plugin.savePluginData();
+						}),
+					),
+			},
+		);
+		return rows;
+	}
 
-		new Setting(containerEl)
-			.setName("Open the note after clipping")
-			.setDesc("Opens the new note in a new tab. Otherwise a message says where it went, with a link to open it.")
-			.addToggle((toggle) =>
-				toggle.setValue(settings.openAfterClip).onChange(async (value) => {
-					settings.openAfterClip = value;
-					await this.plugin.savePluginData();
-				}),
-			);
+	/** Support, laid out as in DuckTapeKiller's other plugins. */
+	private supportRow(): Row {
+		const name = this.plugin.manifest.name;
+		return {
+			name: `Enjoying ${name}?`,
+			desc: "Support its development on Ko-fi.",
+			render: (setting) => {
+				const el = setting.settingEl;
+				el.empty();
+				el.addClass("magazine-rack-support");
+				setIcon(el.createDiv({ cls: "magazine-rack-support-icon" }), "heart");
+				const text = el.createDiv({ cls: "magazine-rack-support-text" });
+				text.createDiv({ cls: "magazine-rack-support-title", text: `Enjoying ${name}?` });
+				const about = text.createEl("p", {
+					text: `${name} is free and open source, made and maintained by DuckTapeKiller. If it is useful to you, you can support its development on `,
+				});
+				// The name stays on one line, so a narrow screen never breaks it at its hyphen.
+				about.createSpan({ cls: "magazine-rack-support-nowrap", text: "Ko-fi" });
+				about.appendText(".");
+				const kofi = el.createEl("a", {
+					cls: "magazine-rack-support-button",
+					href: KOFI_URL,
+					attr: { "aria-label": "Support DuckTapeKiller on Ko-fi" },
+				});
+				setIcon(kofi.createSpan({ cls: "magazine-rack-support-button-icon" }), "coffee");
+				kofi.createSpan({ text: "Support on Ko-fi" });
+			},
+		};
+	}
+
+	// ---------- what the rows do ----------
+
+	/**
+	 * Saves a change to the list of magazines and shows it. With `check`, the
+	 * feeds are read again: for a magazine added, switched on or given new feeds.
+	 */
+	private async afterChange(check: boolean): Promise<void> {
+		await this.plugin.savePluginData();
+		this.plugin.refreshViews();
+		this.refresh();
+		if (!check) return;
+		await this.plugin.recheck();
+		this.refresh();
+	}
+
+	private async importFiles(input: HTMLInputElement): Promise<void> {
+		const files = Array.from(input.files ?? []);
+		const texts = await Promise.all(files.map((file) => file.text()));
+		await this.importTemplates(texts);
 	}
 
 	private async importTemplates(texts: string[]): Promise<void> {
@@ -393,7 +568,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 			try {
 				added.push(...parseTemplates(text));
 			} catch (error) {
-				new Notice(`Could not import: ${error instanceof Error ? error.message : String(error)}.`);
+				new Notice(`Could not import: ${error instanceof Error ? error.message : "the file could not be read"}.`);
 			}
 		}
 		if (!added.length) return;
@@ -406,7 +581,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 		}
 		await this.plugin.savePluginData();
 		new Notice(`Imported ${added.length} ${added.length === 1 ? "template" : "templates"}: ${added.map((t) => t.name).join(", ")}.`);
-		this.display();
+		this.refresh();
 	}
 
 	private async moveTemplate(index: number, step: number): Promise<void> {
@@ -414,59 +589,41 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 		const [item] = list.splice(index, 1);
 		list.splice(index + step, 0, item);
 		await this.plugin.savePluginData();
-		this.display();
-	}
-
-	/** A short how-to for adding a magazine, shown above the list. */
-	private guide(containerEl: HTMLElement): void {
-		const box = containerEl.createDiv({ cls: "magazine-rack-guide" });
-		box.createDiv({ cls: "magazine-rack-guide-title", text: "Adding a magazine or any other source" });
-		box.createEl("p", {
-			text: "The page reads RSS or Atom feeds, which almost every magazine, newspaper, journal and blog publishes, even when it does not advertise one.",
-		});
-		const steps = box.createEl("ol");
-		const step = (strong: string, rest: string) => {
-			const li = steps.createEl("li");
-			li.createEl("strong", { text: strong });
-			li.appendText(` ${rest}`);
-		};
-		step("Add a magazine,", "then type its name and its website address, for example https://www.lrb.co.uk.");
-		step("Find the feed.", "The button looks for the feed the site announces and for the usual addresses.");
-		step(
-			"If nothing is found,",
-			"search the web for the magazine’s name followed by “RSS feed”, or try the website address followed by /feed, /rss or /rss.xml. Paste what you find into Feeds. A section of a site often has its own feed; put several on separate lines and they are merged.",
-		);
-		step(
-			"Test the feeds.",
-			"Each address should report how many articles it holds and its newest headline. “Sent a web page” means that address is not a feed; try another.",
-		);
-		step("Save.", "The magazine appears on the page a few seconds later, with its own colour.");
-		box.createEl("p", {
-			cls: "magazine-rack-guide-note",
-			text: "If every article shows the same name as author, the feed is naming its editor: switch off Show authors. Paywalled magazines work too; the page links to the article and you read it with your own subscription.",
-		});
-	}
-
-	private describe(magazine: Magazine): DocumentFragment {
-		const fragment = document.createDocumentFragment();
-		fragment.createDiv({ text: magazine.feeds.join("\n") || "No feed address", cls: "magazine-rack-feeds" });
-		const entry = this.plugin.cache[magazine.id];
-		let status = "Not checked yet.";
-		if (entry?.error) status = `Last check failed: ${entry.error}.`;
-		else if (entry) status = `${entry.articles.length} ${entry.articles.length === 1 ? "article" : "articles"} from the last check.`;
-		if (!magazine.showAuthor) status += " Authors hidden.";
-		fragment.createDiv({ text: status, cls: entry?.error ? "magazine-rack-error" : "" });
-		return fragment;
+		this.refresh();
 	}
 
 	private async move(index: number, step: number): Promise<void> {
 		const list = this.plugin.settings.magazines;
 		const [item] = list.splice(index, 1);
 		list.splice(index + step, 0, item);
-		await this.plugin.savePluginData();
-		this.plugin.refreshViews();
-		this.display();
+		await this.afterChange(false);
 	}
+
+	/** The feeds and how the last check went, one line each. */
+	private describe(magazine: Magazine): DocumentFragment {
+		const fragment = createFragment();
+		fragment.createDiv({ text: magazine.feeds.join("\n") || "No feed address", cls: "magazine-rack-feeds" });
+		const error = this.plugin.cache[magazine.id]?.error;
+		fragment.createDiv({ text: this.status(magazine), cls: error ? "magazine-rack-error" : "" });
+		return fragment;
+	}
+
+	private status(magazine: Magazine): string {
+		const entry = this.plugin.cache[magazine.id];
+		let status = "Not checked yet.";
+		if (entry?.error) status = `Last check failed: ${entry.error}.`;
+		else if (entry) status = `${entry.articles.length} ${entry.articles.length === 1 ? "article" : "articles"} from the last check.`;
+		if (!magazine.showAuthor) status += " Authors hidden.";
+		return status;
+	}
+}
+
+/** Turns a settings row into a box of its own: a guide or note rather than a name and a control. */
+function blockRow(setting: Setting): HTMLElement {
+	const el = setting.settingEl;
+	el.empty();
+	el.addClass("magazine-rack-block-row");
+	return el.createDiv({ cls: "magazine-rack-guide" });
 }
 
 class MagazineModal extends Modal {
@@ -498,10 +655,11 @@ class MagazineModal extends Modal {
 		const { contentEl } = this;
 		const draft = this.draft;
 
-		contentEl.createEl("p", {
-			cls: "magazine-rack-modal-intro",
-			text: "Type the website and press Find the feed, or paste the feed address yourself. Then press Test the feeds before saving.",
-		});
+		const intro = contentEl.createEl("p", { cls: "magazine-rack-modal-intro", text: "Type the website and press " });
+		intro.createEl("em", { text: "Find the feed" });
+		intro.appendText(", or paste the feed address yourself. Then press ");
+		intro.createEl("em", { text: "Test the feeds" });
+		intro.appendText(" before saving.");
 
 		new Setting(contentEl).setName("Name").addText((text) =>
 			text.setValue(draft.name).onChange((value) => {
@@ -594,7 +752,7 @@ class MagazineModal extends Modal {
 							);
 						} catch (error) {
 							row.addClass("is-bad");
-							const reason = error instanceof Error ? error.message : String(error);
+							const reason = error instanceof Error ? error.message : "the feed could not be read";
 							verdict.setText(`✗ ${reason.charAt(0).toUpperCase()}${reason.slice(1)}.`);
 						}
 					}
@@ -679,15 +837,14 @@ class ConfirmModal extends Modal {
 		this.contentEl.createEl("p", { text: this.question });
 		new Setting(this.contentEl)
 			.addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
-			.addButton((button) =>
-				button
-					.setButtonText(this.action)
-					.setWarning()
-					.onClick(async () => {
-						this.close();
-						await this.onConfirm();
-					}),
-			);
+			.addButton((button) => {
+				// Obsidian's red button for an action that removes something, on every version.
+				button.buttonEl.addClass("mod-warning");
+				button.setButtonText(this.action).onClick(async () => {
+					this.close();
+					await this.onConfirm();
+				});
+			});
 	}
 
 	onClose(): void {
@@ -706,10 +863,14 @@ class PasteModal extends Modal {
 
 	onOpen(): void {
 		const { contentEl } = this;
-		contentEl.createEl("p", {
+		const intro = contentEl.createEl("p", {
 			cls: "magazine-rack-modal-intro",
-			text: "In Web Clipper's settings, open the template, then More → Copy to clipboard, and paste it here.",
+			text: "In Web Clipper's settings, open the template, then ",
 		});
+		intro.createEl("em", { text: "More" });
+		intro.appendText(" → ");
+		intro.createEl("em", { text: "Copy to clipboard" });
+		intro.appendText(", and paste it here.");
 		const area = contentEl.createEl("textarea", { cls: "magazine-rack-paste", attr: { rows: "10", spellcheck: "false" } });
 		new Setting(contentEl)
 			.addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))

@@ -6,9 +6,11 @@ const DAY = 24 * HOUR;
 /** Everything the page and its menus say, in each language. Settings stay in English. */
 export interface Strings {
 	everything: string;
-	saved: string;
+	moreMagazines: (n: number) => string;
+	showFewer: string;
 	justIn: string;
-	savedForLater: string;
+	readLater: string;
+	frontPage: string;
 	newBadge: string;
 	readMark: string;
 	savedMark: string;
@@ -61,9 +63,11 @@ export interface Strings {
 
 const en: Strings = {
 	everything: "Everything",
-	saved: "Saved",
+	moreMagazines: (n) => `Show ${n} more ${n === 1 ? "magazine" : "magazines"}`,
+	showFewer: "Show fewer",
 	justIn: "Just in",
-	savedForLater: "Saved for later",
+	readLater: "Read later",
+	frontPage: "Front page",
 	newBadge: "New",
 	readMark: "Read",
 	savedMark: "Saved",
@@ -74,7 +78,7 @@ const en: Strings = {
 	markAllRead: "Mark all as read",
 	checkForNew: "Check for new articles",
 	allCaughtUp: "All caught up.",
-	nothingSaved: "Nothing saved yet. Use the bookmark on any article to keep it here.",
+	nothingSaved: "Nothing to read later yet. Use the bookmark on any article to keep it here.",
 	lastCheckFailed: (error, time, now) => {
 		const date = new Date(time);
 		const hm = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
@@ -89,21 +93,21 @@ const en: Strings = {
 	fetching: "Fetching the latest articles…",
 	noMagazines: "No magazines are switched on. Choose them in the plugin's settings.",
 	nothingYet: "Nothing here yet. Press the refresh button above to fetch the latest articles.",
-	saveForLater: "Save for later",
-	unsave: "Remove from saved",
+	saveForLater: "Save to Read later",
+	unsave: "Remove from Read later",
 	markRead: "Mark as read",
 	markUnread: "Mark as unread",
 	removeFromPage: "Remove from the page",
-	removeFromSaved: "Remove from saved",
+	removeFromSaved: "Remove from Read later",
 	clipToVault: "Clip to vault",
 	clipWith: (template) => `Clip with “${template}”`,
 	copyLink: "Copy link",
 	moreActions: "More actions",
 	support: "Enjoying Magazine Rack? Support it on Ko-fi",
 	undo: "Undo",
-	savedNotice: "Saved for later.",
+	savedNotice: "Saved to Read later.",
 	removedNotice: "Removed from the page.",
-	unsavedNotice: "Removed from saved.",
+	unsavedNotice: "Removed from Read later.",
 	andOthers: (first) => `${first} and others`,
 	markedAllRead: (n) => `Marked ${n} ${n === 1 ? "article" : "articles"} as read.`,
 	linkCopied: "Link copied.",
@@ -171,9 +175,11 @@ const DIAS = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "
 
 const es: Strings = {
 	everything: "Todo",
-	saved: "Guardados",
+	moreMagazines: (n) => `Mostrar ${n} ${n === 1 ? "revista más" : "revistas más"}`,
+	showFewer: "Mostrar menos",
 	justIn: "Lo último",
-	savedForLater: "Guardados para leer después",
+	readLater: "Leer después",
+	frontPage: "Portada",
 	newBadge: "Nuevo",
 	readMark: "Leído",
 	savedMark: "Guardado",
@@ -184,7 +190,7 @@ const es: Strings = {
 	markAllRead: "Marcar todo como leído",
 	checkForNew: "Buscar artículos nuevos",
 	allCaughtUp: "Estás al día.",
-	nothingSaved: "Aún no hay nada guardado. Usa el marcador de cualquier artículo para guardarlo aquí.",
+	nothingSaved: "Aún no hay nada para leer después. Usa el marcador de cualquier artículo para guardarlo aquí.",
 	lastCheckFailed: (error, time, now) => {
 		const date = new Date(time);
 		const hm = date.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit" });
@@ -198,21 +204,21 @@ const es: Strings = {
 	fetching: "Buscando los últimos artículos…",
 	noMagazines: "No hay ninguna revista activada. Elígelas en los ajustes del complemento.",
 	nothingYet: "Aún no hay nada. Pulsa el botón de actualizar, arriba, para traer los últimos artículos.",
-	saveForLater: "Guardar para leer después",
-	unsave: "Quitar de guardados",
+	saveForLater: "Guardar en Leer después",
+	unsave: "Quitar de Leer después",
 	markRead: "Marcar como leído",
 	markUnread: "Marcar como no leído",
 	removeFromPage: "Quitar de la página",
-	removeFromSaved: "Quitar de guardados",
+	removeFromSaved: "Quitar de Leer después",
 	clipToVault: "Guardar en la bóveda",
 	clipWith: (template) => `Guardar con «${template}»`,
 	copyLink: "Copiar enlace",
 	moreActions: "Más acciones",
 	support: "¿Te gusta Magazine Rack? Apóyalo en Ko-fi",
 	undo: "Deshacer",
-	savedNotice: "Guardado para leer después.",
+	savedNotice: "Guardado en Leer después.",
 	removedNotice: "Se ha quitado de la página.",
-	unsavedNotice: "Se ha quitado de guardados.",
+	unsavedNotice: "Se ha quitado de Leer después.",
 	andOthers: (first) => `${first} y otros`,
 	markedAllRead: (n) => `${n} ${n === 1 ? "artículo marcado" : "artículos marcados"} como leído${n === 1 ? "" : "s"}.`,
 	linkCopied: "Enlace copiado.",

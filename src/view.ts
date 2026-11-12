@@ -7,8 +7,7 @@ const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 /** How many of the newest pieces across all magazines open the page. */
 const JUST_IN = 5;
-/** Saved pieces shown on the whole page; the Saved chip shows them all. */
-const SAVED_PREVIEW = 8;
+/** The reading list, a page of its own opened from the masthead. */
 const SAVED = "__saved__";
 
 /** What a card needs to know about where its article comes from. */
@@ -55,11 +54,13 @@ export function parseOptions(source: string): BlockOptions {
 
 /** The front page drawn wherever a ```magazine-rack block appears. */
 export class FrontPage extends MarkdownRenderChild {
-	/** The magazine the reader is focused on, SAVED for the saved list, or null for the whole page. */
+	/** The magazine the reader is focused on, SAVED for the reading list, or null for the whole page. */
 	private focus: string | null = null;
 	private t!: Strings;
 	private now = 0;
 	private leaveOutRules = new Map<string, ((article: Article) => boolean)[]>();
+	/** Folds the chips again when the page changes width. */
+	private chipsResize: ResizeObserver | null = null;
 
 	constructor(
 		containerEl: HTMLElement,
@@ -76,10 +77,13 @@ export class FrontPage extends MarkdownRenderChild {
 
 	onunload(): void {
 		this.plugin.views.delete(this);
+		this.chipsResize?.disconnect();
 	}
 
 	render(): void {
 		const root = this.containerEl;
+		this.chipsResize?.disconnect();
+		this.chipsResize = null;
 		root.empty();
 		root.addClass("mr-page");
 		this.t = this.plugin.t();
@@ -88,23 +92,28 @@ export class FrontPage extends MarkdownRenderChild {
 
 		const magazines = this.magazines();
 		if (this.focus && this.focus !== SAVED && !magazines.some((m) => m.id === this.focus)) this.focus = null;
-		if (this.focus === SAVED && !this.plugin.saved.length) this.focus = null;
 
 		this.masthead(root, magazines);
-		if (magazines.length > 1 || this.plugin.saved.length) this.chips(root, magazines);
-
+		// The reading list is a page of its own: the front page carries only the magazines.
 		if (this.focus === SAVED) {
-			this.savedSection(root, true);
+			this.readingList(root);
 			return;
 		}
+		if (magazines.length > 1) this.chips(root, magazines);
+
 		const shown = this.focus ? magazines.filter((m) => m.id === this.focus) : magazines;
-		const anything = shown.some((m) => this.allArticles(m).length) || (!this.focus && this.plugin.saved.length > 0);
+		const anything = shown.some((m) => this.allArticles(m).length);
 		if (!anything) {
-			this.emptyState(root);
+			// Feeds that could not be read say why in their sections, rather than "Nothing here yet".
+			const failed = shown.filter((m) => this.plugin.cache[m.id]?.error);
+			if (failed.length && !this.plugin.isChecking()) {
+				for (const magazine of failed) this.section(root, magazine);
+			} else {
+				this.emptyState(root);
+			}
 			return;
 		}
 		if (!this.focus && magazines.length > 1) this.justIn(root, magazines);
-		if (!this.focus && this.plugin.saved.length) this.savedSection(root, false);
 		for (const magazine of shown) this.section(root, magazine);
 	}
 
@@ -146,6 +155,18 @@ export class FrontPage extends MarkdownRenderChild {
 		const allRead = this.toolButton(tools, "check-check", t.markAllRead, true);
 		this.onPress(allRead, () => this.markAllRead(this.scopeForMarkAll(magazines)));
 
+		// The reading list: pressed again, or "Front page" on the list, goes back.
+		const inList = this.focus === SAVED;
+		const later = this.toolButton(tools, "bookmark", t.readLater, true);
+		const count = this.savedEntries().length;
+		if (count) later.createSpan({ cls: "mr-tool-count", text: String(count) });
+		later.toggleClass("is-active", inList);
+		later.setAttr("aria-pressed", String(inList));
+		this.onPress(later, () => {
+			this.focus = inList ? null : SAVED;
+			this.render();
+		});
+
 		// A quiet way to support the plugin, tucked into the masthead's corner.
 		const heart = head.createEl("a", { cls: "mr-support", href: KOFI_URL, attr: { "aria-label": t.support } });
 		setIcon(heart, "heart");
@@ -154,17 +175,14 @@ export class FrontPage extends MarkdownRenderChild {
 
 	private chips(root: HTMLElement, magazines: Magazine[]): void {
 		const nav = root.createDiv({ cls: "mr-chips", attr: { role: "tablist" } });
-		const chip = (
-			label: string,
-			id: string | null,
-			options: { color?: string; accent?: string; icon?: string; count?: number } = {},
-		) => {
+		const chip = (label: string, id: string | null, options: { color?: string; count?: number } = {}) => {
 			const el = nav.createEl("button", { cls: "mr-chip", attr: { role: "tab" } });
 			el.toggleClass("is-active", this.focus === id);
 			el.setAttr("aria-selected", String(this.focus === id));
-			if (options.color || options.accent) el.style.setProperty("--mr-accent", options.color ?? options.accent ?? "");
-			if (options.color) el.createSpan({ cls: "mr-chip-dot" });
-			if (options.icon) setIcon(el.createSpan({ cls: "mr-chip-icon" }), options.icon);
+			if (options.color) {
+				el.style.setProperty("--mr-accent", options.color);
+				el.createSpan({ cls: "mr-chip-dot" });
+			}
 			el.createSpan({ text: label });
 			if (options.count) el.createSpan({ cls: "mr-chip-count", text: String(options.count) });
 			this.onPress(el, () => {
@@ -173,15 +191,40 @@ export class FrontPage extends MarkdownRenderChild {
 			});
 		};
 		chip(this.t.everything, null);
-		if (this.plugin.saved.length) {
-			chip(this.t.saved, SAVED, { icon: "bookmark", accent: "var(--interactive-accent)", count: this.savedEntries().length });
-		}
 		for (const magazine of magazines) {
 			chip(shortName(magazine.name), magazine.id, {
 				color: magazine.color,
 				count: this.visible(magazine).filter((a) => this.isNew(a)).length,
 			});
 		}
+
+		// Many magazines fill several lines: folded, the row keeps to one, and a chip shows the rest.
+		const folded = this.plugin.settings.chipsFolded;
+		const toggle = nav.createEl("button", { cls: "mr-chip mr-chip-toggle", attr: { "aria-expanded": String(!folded) } });
+		const toggleText = toggle.createSpan();
+		setIcon(toggle.createSpan({ cls: "mr-chip-toggle-icon" }), folded ? "chevron-down" : "chevron-up");
+		this.onPress(toggle, () => {
+			this.plugin.settings.chipsFolded = !folded;
+			void this.plugin.savePluginData();
+			this.plugin.refreshViews();
+		});
+		if (folded) {
+			nav.addClass("is-folded");
+			// Folded again when the row's width changes, or when it turns into the one-line row of a narrow pane.
+			let layout = "";
+			const fold = () => {
+				const now = `${nav.clientWidth} ${getComputedStyle(nav).flexWrap}`;
+				if (now === layout) return;
+				layout = now;
+				this.foldChips(nav, toggle, toggleText);
+			};
+			this.chipsResize = new ResizeObserver(fold);
+			this.chipsResize.observe(nav);
+		} else {
+			toggleText.setText(this.t.showFewer);
+			toggle.setAttr("aria-label", this.t.showFewer);
+		}
+
 		// On a phone the row scrolls sideways: bring the chosen chip into view.
 		window.requestAnimationFrame(() => {
 			const active = nav.querySelector<HTMLElement>(".mr-chip.is-active");
@@ -189,6 +232,37 @@ export class FrontPage extends MarkdownRenderChild {
 				nav.scrollLeft = active.offsetLeft - nav.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
 			}
 		});
+	}
+
+	/**
+	 * Keeps the folded row to its first line: chips that do not fit are hidden from the end,
+	 * apart from the chosen one, and the last chip says how many are hidden. When all fit,
+	 * as on a phone, where the row scrolls sideways instead, nothing is hidden.
+	 */
+	private foldChips(nav: HTMLElement, toggle: HTMLElement, toggleText: HTMLElement): void {
+		const chips = Array.from(nav.querySelectorAll<HTMLElement>(".mr-chip:not(.mr-chip-toggle)"));
+		for (const chip of chips) chip.removeClass("is-hidden");
+		toggle.addClass("is-hidden");
+		// A narrow pane's row is one line that scrolls sideways: every chip stays.
+		if (!chips.length || nav.clientWidth === 0 || getComputedStyle(nav).flexWrap === "nowrap") return;
+		const top = chips[0].offsetTop;
+		const fits = () => chips.every((chip) => chip.hasClass("is-hidden") || chip.offsetTop === top);
+		if (fits()) return;
+
+		toggle.removeClass("is-hidden");
+		const hideable = chips.slice(1).filter((chip) => !chip.hasClass("is-active")).reverse();
+		let hidden = 0;
+		const label = () => {
+			toggleText.setText(`+${hidden}`);
+			toggle.setAttr("aria-label", this.t.moreMagazines(hidden));
+		};
+		label();
+		for (const chip of hideable) {
+			if (fits() && toggle.offsetTop === top) break;
+			chip.addClass("is-hidden");
+			hidden++;
+			label();
+		}
 	}
 
 	private justIn(root: HTMLElement, magazines: Magazine[]): void {
@@ -207,41 +281,35 @@ export class FrontPage extends MarkdownRenderChild {
 		for (const entry of entries.slice(1)) this.card(side, entry, "compact", false);
 	}
 
-	private savedSection(root: HTMLElement, all: boolean): void {
+	/** The articles saved to read later, on a page of their own. */
+	private readingList(root: HTMLElement): void {
+		const t = this.t;
 		const entries = this.savedEntries();
-		const section = root.createDiv({ cls: "mr-section mr-saved" });
+		const section = root.createDiv({ cls: "mr-section mr-reading-list" });
 		section.style.setProperty("--mr-accent", "var(--interactive-accent)");
+
+		const back = section.createEl("a", { cls: "mr-back", href: "#", text: `← ${t.frontPage}` });
+		this.onPress(back, () => {
+			this.focus = null;
+			this.render();
+		});
+
 		const head = section.createDiv({ cls: "mr-section-head" });
 		const name = head.createDiv({ cls: "mr-section-name", attr: { role: "heading", "aria-level": "2" } });
 		setIcon(name.createSpan({ cls: "mr-section-icon" }), "bookmark");
-		name.appendText(this.t.savedForLater);
+		name.appendText(t.readLater);
 		const links = head.createDiv({ cls: "mr-section-links" });
 		if (entries.some((e) => !this.plugin.isRead(e.article.url))) {
-			const mark = links.createEl("a", { cls: "mr-section-link", href: "#", text: this.t.markAllRead });
+			const mark = links.createEl("a", { cls: "mr-section-link", href: "#", text: t.markAllRead });
 			this.onPress(mark, () => this.markAllRead(entries.map((e) => e.article.url)));
 		}
 
 		if (!entries.length) {
-			section.createDiv({
-				cls: "mr-quiet",
-				text: this.plugin.saved.length ? this.t.allCaughtUp : this.t.nothingSaved,
-			});
+			section.createDiv({ cls: "mr-quiet", text: this.plugin.saved.length ? t.allCaughtUp : t.nothingSaved });
 			return;
 		}
-		const shown = all ? entries : entries.slice(0, SAVED_PREVIEW);
 		const grid = section.createDiv({ cls: "mr-grid" });
-		for (const entry of shown) this.card(grid, entry, "card", true);
-		if (!all && entries.length > shown.length) {
-			const more = section.createEl("a", {
-				cls: "mr-see-all",
-				href: "#",
-				text: `${this.t.saved} (${entries.length}) →`,
-			});
-			this.onPress(more, () => {
-				this.focus = SAVED;
-				this.render();
-			});
-		}
+		for (const entry of entries) this.card(grid, entry, "card", true);
 	}
 
 	private section(root: HTMLElement, magazine: Magazine): void {
@@ -323,7 +391,8 @@ export class FrontPage extends MarkdownRenderChild {
 		});
 
 		const media = card.createDiv({ cls: "mr-media" });
-		const image = article.image ?? this.plugin.pageImages[article.url] ?? undefined;
+		// A feed's small thumbnail is the last resort, after the picture the article page offers.
+		const image = article.image ?? this.plugin.pageImages[article.url] ?? article.thumbnail;
 		if (image) {
 			const img = media.createEl("img", {
 				attr: { src: image, alt: "", loading: "lazy", decoding: "async", referrerpolicy: "no-referrer" },
@@ -602,7 +671,7 @@ function shortName(name: string): string {
 
 /** "A, B, C and D" becomes "A and others", so a long byline stays on one line. */
 function shortByline(author: string, t: Strings): string {
-	const people = author.split(/\s*,\s*|\s+and\s+|\s+y\s+|\s*&\s*/).filter(Boolean);
+	const people = author.split(/\s*[,;]\s*|\s+and\s+|\s+y\s+|\s*&\s*/).filter(Boolean);
 	return people.length > 2 ? t.andOthers(people[0]) : author;
 }
 

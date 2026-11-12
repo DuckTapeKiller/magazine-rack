@@ -3,7 +3,7 @@
 <p align="center"><strong>The Reading Room: a front page for the magazines you read, inside Obsidian.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/CasaAmarillaRoja/magazine-rack/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/CasaAmarillaRoja/magazine-rack?style=flat-square&label=release&color=7a5c99"></a>
+  <a href="https://github.com/DuckTapeKiller/magazine-rack/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/DuckTapeKiller/magazine-rack?style=flat-square&label=release&color=7a5c99"></a>
   <img alt="Obsidian 1.4 or later" src="https://img.shields.io/badge/Obsidian-1.4%2B-483699?style=flat-square&logo=obsidian&logoColor=white">
   <img alt="Desktop and mobile" src="https://img.shields.io/badge/desktop%20%26%20mobile-supported-3d7a5a?style=flat-square">
   <img alt="English and Spanish" src="https://img.shields.io/badge/page-English%20%C2%B7%20Espa%C3%B1ol-b5543a?style=flat-square">
@@ -11,40 +11,36 @@
 </p>
 
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/front-page-dark.jpg">
-    <img alt="The Reading Room in Obsidian, showing The Public Domain Review: a large lead story with its picture, then a grid of picture cards" src="docs/front-page-light.jpg" width="900">
-  </picture>
+  <img alt="The Reading Room in Obsidian with the Brutalist theme: the masthead with its Read later button, the row of magazine chips folded to one line, and The Public Domain Review's section, a large lead story and a row of picture cards" src="docs/front-page.jpg" width="900">
 </p>
 
-Magazine Rack turns one note into a page you want to open: the newest pieces from the magazines you follow, each with its picture, headline, standfirst and author, laid out like the front of a magazine. Click a story and it opens in your browser. Save it for later, mark it read, take it off the page, or clip it into your vault with your Obsidian Web Clipper templates. The page keeps itself up to date while Obsidian is open.
+Magazine Rack turns one note into a page you want to open: the newest pieces from the magazines you follow, each with its picture, headline, standfirst and author, laid out like the front of a magazine. Click a story and it opens in your browser. Save it to read later, mark it read, take it off the page, or clip it into your vault with your Obsidian Web Clipper templates. The page keeps itself up to date while Obsidian is open.
 
-It comes set up with seven magazines: **Aeon**, **JSTOR Daily**, **The Atlantic**, **The New York Times**, **Epoché**, **The Public Domain Review** and **The New York Review of Books**. You can add any other magazine, newspaper, journal or blog that publishes a feed, which is almost all of them.
+It comes set up with twenty-three sources in English, Spanish and French: magazines such as **Aeon**, **The Atlantic**, **Psyche**, **Noema**, **Granta**, **Letras Libres** and **The New York Review of Books**, and newspapers such as **The Guardian**, **Le Monde**, **El País** and **La Nación** (the full list is below). Switch off what you do not read, and add any other magazine, newspaper, journal or blog that publishes a feed, which is almost all of them.
 
 ## What is on the page
 
-- **A masthead** with today's date, the page title, how many pieces are new today and when it last checked, with three buttons: check now, *Unread only*, and *Mark all as read*.
-- **A chip for each magazine**, with a count of today's unread pieces, and a **Saved** chip for what you have put aside. Click one to see only that magazine, or only your saved pieces; click *Everything* to go back.
+- **A masthead** with today's date, the page title, how many pieces are new today and when it last checked, with four buttons: check now, *Unread only*, *Mark all as read*, and *Read later*, which opens your reading list.
+- **A chip for each magazine**, with a count of its unread pieces from the last 24 hours. Click one to see only that magazine; click *Everything* to go back. With many magazines the row folds to a single line, ending in a chip such as *+16* that unfolds the rest and *Show fewer* that folds them again; the page remembers which you chose, and the magazine you are reading always stays in view.
 - **Just in**: the newest piece across all your magazines as a large lead story, with the next four beside it.
-- **Saved for later**: the pieces you have saved, kept until you take them off the list, even after they leave the magazine's feed.
 - **A section for each magazine**, in its own colour. Its newest article leads, picture beside the words, followed by a grid of cards.
 - **A tag on every picture** naming the magazine, so you always know where a piece comes from.
 - **New and read.** Pieces from the last 24 hours carry a *New* badge until you open them. Opened pieces are dimmed and marked *Read*.
 - **No picture, no gap.** An article without one gets a plate with the magazine's initials on its colour.
 
-The page takes its colours from your theme, so it looks at home in light mode, dark mode and any community theme. It can speak English or Spanish: the dates, labels and menus follow the language you choose in the settings.
+The page takes its colours and its corners from your theme, so it looks at home in light mode, dark mode and any community theme: in a theme with square corners, such as Brutalist, its buttons, chips and pictures are square too. It can speak English or Spanish: the dates, labels and menus follow the language you choose in the settings.
 
 ## Save, read, remove, clip
 
 <p align="center">
-  <img alt="A card with its buttons showing: save for later, mark as read, clip to vault, remove, and more" src="docs/card-buttons.png" width="260">
+  <img alt="A card with its buttons showing: save to Read later, mark as read, clip to vault, remove, and more" src="docs/card-buttons.png" width="258">
   &nbsp;&nbsp;&nbsp;
-  <img alt="The menu of a card: save for later, mark as read, remove from the page, clip to vault, clip with a chosen template, copy link" src="docs/card-menu.png" width="372">
+  <img alt="The menu of a card: save to Read later, mark as read, remove from the page, clip to vault, copy link" src="docs/card-menu.png" width="424">
 </p>
 
 Point at a card and five buttons appear on its picture:
 
-- **Save for later**, which keeps the piece in *Saved for later* until you take it off;
+- **Save to Read later**, which puts the piece on your reading list (see below);
 - **Mark as read**, or unread again;
 - **Clip to vault** (see below);
 - **Remove**, which takes the piece off the page;
@@ -52,13 +48,19 @@ Point at a card and five buttons appear on its picture:
 
 Right-clicking a card opens the same menu. On a phone or tablet the picture shows only the menu button, and the small rows have it at the end of their label line. Saving, removing and *Mark all as read* each show a message with **Undo**.
 
-*Unread only* hides everything you have read, across the whole page. *Mark all as read* in the masthead covers what the page is showing; each section has its own as well.
+## Read later
+
+<p align="center"><img alt="The reading list on a page of its own: the masthead with Read later pressed, a link back to the front page, and four saved pieces from The Public Domain Review" src="docs/reading-list.jpg" width="900"></p>
+
+The pieces you save wait on a page of their own, away from the news. Press *Read later* in the masthead to open it, and *Front page* (or *Read later* again) to go back; the button shows how many pieces are waiting. They stay until you take them off, even after they leave the magazine's feed, and the cross on a card, or *Remove from Read later* in its menu, takes one off, with **Undo**.
+
+*Unread only* hides everything you have read, across the whole page and the reading list. *Mark all as read* in the masthead covers what the page is showing; each section has its own as well.
 
 Feeds only hold their newest pieces, and a busy one such as *The New York Times*' top stories moves on within hours. So the page keeps every article for a week after it leaves its feed, or for as long as you choose.
 
 ## Clip to vault with your Web Clipper templates
 
-<p align="center"><img alt="The Clip to vault settings: how to import Web Clipper templates, the imported templates with their folders and triggers, and the import buttons" src="docs/clip-settings.png" width="760"></p>
+<p align="center"><img alt="The Clip to vault settings: how to import Web Clipper templates, the imported templates with their folders and triggers, and the import buttons" src="docs/clip-settings.png" width="694"></p>
 
 The scissors save an article as a note in your vault, using your [Obsidian Web Clipper](https://obsidian.md/clipper) templates: the same folder, note name, properties and content you get in your browser.
 
@@ -81,7 +83,7 @@ Three things it cannot do that Web Clipper in your browser can:
 
 The layout follows the width of the pane, not the device, so it works on a phone, on a tablet and in a narrow side pane on the desktop.
 
-On a narrow screen the chips scroll sideways and the chosen one stays in view. Each magazine's lead story keeps its full picture, and the rest become rows with a square thumbnail, the magazine's name and when the piece was published.
+On a narrow screen the chips stay on one line that scrolls sideways, and the chosen one stays in view. Each magazine's lead story keeps its full picture, and the rest become rows with a square thumbnail, the magazine's name and when the piece was published.
 
 Everything runs in Obsidian itself, on desktop and mobile alike. There is no server and no account.
 
@@ -93,7 +95,7 @@ The note opens in reading view each time, even in vaults that open notes for edi
 
 Open **Settings → Magazine Rack**. Above the list of magazines there is a short guide:
 
-<p align="center"><img alt="The guide in the settings: how to add a magazine, find its feed and test it" src="docs/settings-guide.png" width="760"></p>
+<p align="center"><img alt="The guide in the settings: how to add a magazine, find its feed and test it" src="docs/settings-guide.png" width="694"></p>
 
 1. **Press *Add a magazine*.** Type its name and its website address, for example `https://www.lrb.co.uk`.
 2. **Press *Find the feed*.** The plugin reads the feed the site announces in its pages, and tries the usual addresses if it announces none.
@@ -108,7 +110,7 @@ Two tips. If every article shows the same author, the feed is naming its editor 
 
 ## Where the pictures come from
 
-From the feed, where it carries them. Where it does not (Epoché and The New York Review of Books, for example), Magazine Rack reads the picture each article page offers for sharing, once per article, and remembers it. A site that refuses that request gets the initials plate instead.
+From the feed, where it carries them. Where it does not (Epoché, Nature and The New York Review of Books, for example), Magazine Rack reads the picture each article page offers for sharing and remembers it. It does the same when a feed's pictures are only small thumbnails, as the BBC's are, so the large cards stay sharp. A page that gives no picture is tried again at the next two checks, since some sites fail now and then; after that the article gets the initials plate.
 
 ## The magazines it starts with
 
@@ -121,8 +123,24 @@ From the feed, where it carries them. Where it does not (Epoché and The New Yor
 | Epoché Magazine | `https://epochemagazine.org/feed/` |
 | The Public Domain Review | `https://publicdomainreview.org/rss.xml` |
 | The New York Review of Books | `https://www.nybooks.com/feed/?post_type=article` (the print issue) and `https://www.nybooks.com/feed/?post_type=daily` (the online pieces), merged. The site's main feed is empty. |
+| The Guardian | `https://www.theguardian.com/world/rss` (world news) |
+| Le Monde | `https://www.lemonde.fr/rss/une.xml` (front page) |
+| El País | `https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/portada` (front page) |
+| El Espectador | `https://www.elespectador.com/arc/outboundfeeds/discover/` |
+| La Nación | `https://www.lanacion.com.ar/arc/outboundfeeds/rss/` |
+| BBC | `https://feeds.bbci.co.uk/news/rss.xml` (top stories) |
+| Epoch Times | `https://feed.theepochtimes.com/us/feed` |
+| Psyche | `https://psyche.co/feed`. It includes Psyche's films; add `/videos/` to *Leave out* to keep only the writing. |
+| Nature | `https://www.nature.com/nature.rss` |
+| Big Think | `https://bigthink.com/feed/` |
+| Noema | `https://www.noemamag.com/feed/` |
+| Letras Libres | `https://letraslibres.com/feed/` |
+| Zenda | `https://www.zendalibros.com/feed/` |
+| El Cultural | `https://www.elespanol.com/rss/el-cultural/` |
+| McSweeney’s | `https://feeds.feedburner.com/mcsweeneys` |
+| Granta | `https://grantamag.substack.com/feed`, Granta's own Substack. granta.com turns away anything that is not a browser, so its pages cannot be read. |
 
-Authors are hidden for Epoché and The New York Review of Books, because their feeds name the editor who posted each piece. Switch any magazine off, reorder the list or remove what you do not read.
+Authors are hidden for Epoché, The New York Review of Books and Granta, because their feeds name the editor who posted each piece, or the magazine itself. Switch any magazine off, reorder the list or remove what you do not read.
 
 ## Settings
 
@@ -152,13 +170,13 @@ articles: 6
 ```
 ````
 
-The articles, your saved list and what you have read are kept in the plugin's data file (`.obsidian/plugins/magazine-rack/data.json`), so the note itself never changes when new pieces arrive. If your vault is under git, you may want to ignore that file, since it changes at every check.
+The articles, your reading list and what you have read are kept in the plugin's data file (`.obsidian/plugins/magazine-rack/data.json`), so the note itself never changes when new pieces arrive. If your vault is under git, you may want to ignore that file, since it changes at every check.
 
 ## Install
 
-**With BRAT.** Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin, choose *Add beta plugin*, and enter `CasaAmarillaRoja/magazine-rack`.
+**With BRAT.** Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin, choose *Add beta plugin*, and enter `DuckTapeKiller/magazine-rack`.
 
-**By hand.** Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/CasaAmarillaRoja/magazine-rack/releases/latest) into `<your vault>/.obsidian/plugins/magazine-rack/`.
+**By hand.** Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/DuckTapeKiller/magazine-rack/releases/latest) into `<your vault>/.obsidian/plugins/magazine-rack/`.
 
 Then switch on **Magazine Rack** in Settings → Community plugins, and click the newspaper icon in the left ribbon.
 
@@ -168,7 +186,7 @@ Magazine Rack talks only to the magazines you list: their feeds, their article p
 
 ## Support
 
-Magazine Rack is free and open source. If it is useful to you, you can support its development on [Ko-fi](https://ko-fi.com/ducktapekiller): there is a small heart in the corner of the page's masthead, and a *Support* section at the end of the settings.
+Magazine Rack is free and open source. If it is useful to you, you can support its development on [Ko-fi](https://ko-fi.com/ducktapekiller): there is a small heart, beating softly, in the corner of the page's masthead, and a *Support* section at the end of the settings.
 
 ## Building from source
 
@@ -180,7 +198,7 @@ npm install
 npm run build
 ```
 
-This writes `main.js` next to `manifest.json` and `styles.css`.
+This type-checks the code, runs Obsidian's official plugin lint ([eslint-plugin-obsidianmd](https://github.com/obsidianmd/eslint-plugin)) with no warnings allowed, and writes `main.js` next to `manifest.json` and `styles.css`. `npm run lint` runs the lint alone.
 
 Magazine Rack bundles Defuddle, Knap and Day.js, and Defuddle's full build includes Turndown and mathml-to-latex. All are MIT-licensed; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 

@@ -11,7 +11,7 @@
 import Defuddle, { createMarkdownContent } from "defuddle/full";
 import { createEngine, standardFilters, type FilterRegistry, type TemplateFilter } from "knap";
 import { htmlFilters } from "knap/html";
-import { App, TFile, moment, normalizePath, requestUrl } from "obsidian";
+import { App, Platform, TFile, moment, normalizePath, requestUrl } from "obsidian";
 import { withTimeout } from "./feeds";
 import { DEFAULT_CLIP_TEMPLATE, type ClipTemplate } from "./types";
 
@@ -213,6 +213,13 @@ export function parseTemplates(json: string): ClipTemplate[] {
 	return found;
 }
 
+/** A property value as text: Web Clipper writes strings, and a number or true/false is read as written. */
+function scalarText(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	return "";
+}
+
 function cleanTemplate(record: Record<string, unknown>): ClipTemplate {
 	const behavior = BEHAVIOURS.includes(record.behavior as ClipTemplate["behavior"])
 		? (record.behavior as ClipTemplate["behavior"])
@@ -223,7 +230,7 @@ function cleanTemplate(record: Record<string, unknown>): ClipTemplate {
 				.filter((p) => typeof p.name === "string" && p.name.trim())
 				.map((p) => ({
 					name: String(p.name),
-					value: typeof p.value === "string" ? p.value : String(p.value ?? ""),
+					value: scalarText(p.value),
 					...(typeof p.type === "string" && p.type ? { type: p.type } : {}),
 				}))
 		: [];
@@ -371,8 +378,9 @@ function resolveSchema(key: string, variables: Record<string, string>): unknown 
 	if (array) {
 		const raw = lookup(array[1]);
 		if (raw === undefined) return undefined;
-		const list = parse(raw);
-		if (!Array.isArray(list)) return undefined;
+		const parsed = parse(raw);
+		if (!Array.isArray(parsed)) return undefined;
+		const list = parsed as unknown[];
 		const pick = (item: unknown) => (array[3] ? nested(item, array[3]) : item);
 		if (array[2] === "*") return list.map(pick).filter((v) => v != null);
 		const item = list[Number(array[2])];
@@ -608,7 +616,8 @@ function matchSchemaTrigger(pattern: string, data: unknown): boolean {
 	const match = pattern.match(/^schema:(@\w+)?(?:\.(.+?))?(?:=(.+))?$/);
 	if (!match || (!match[1] && !match[2])) return false;
 	const [, type, key, expected] = match;
-	const list = (Array.isArray(data) ? data : [data]).flatMap((d) => (Array.isArray(d) ? d : [d]));
+	const top: unknown[] = Array.isArray(data) ? (data as unknown[]) : [data];
+	const list = top.flatMap((d): unknown[] => (Array.isArray(d) ? (d as unknown[]) : [d]));
 	for (const schema of list) {
 		if (!schema || typeof schema !== "object") continue;
 		const record = schema as Record<string, unknown>;
@@ -644,17 +653,17 @@ function domainOf(url: string): string {
 
 /** Web Clipper's file-name rules: no Obsidian link characters, nothing the file system refuses. */
 export function sanitizeFileName(name: string): string {
-	const platform = navigator.platform || "";
+	// Control characters (\p{Cc}) are never allowed in a file name.
 	let clean = name.replace(/[#|^[\]]/g, "");
-	if (/win/i.test(platform)) {
+	if (Platform.isWin) {
 		clean = clean
-			.replace(/[<>:"/\\?*\x00-\x1F]/g, "")
+			.replace(/[<>:"/\\?*\p{Cc}]/gu, "")
 			.replace(/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\..*)?$/i, "_$1$2")
 			.replace(/[\s.]+$/, "");
-	} else if (/mac/i.test(platform)) {
-		clean = clean.replace(/[/:\x00-\x1F]/g, "").replace(/^\./, "_");
+	} else if (Platform.isMacOS) {
+		clean = clean.replace(/[/:\p{Cc}]/gu, "").replace(/^\./, "_");
 	} else {
-		clean = clean.replace(/[<>:"/\\|?*\x00-\x1F]/g, "").replace(/^\./, "_");
+		clean = clean.replace(/[<>:"/\\|?*\p{Cc}]/gu, "").replace(/^\./, "_");
 	}
 	return clean.replace(/^\.+/, "").trim().slice(0, 245);
 }
