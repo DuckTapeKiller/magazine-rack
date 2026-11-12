@@ -536,5 +536,5 @@ function sortArticles(articles: Article[], merged: boolean): Article[] {
 }
 
 function message(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
+	return error instanceof Error ? error.message : "unknown error";
 }

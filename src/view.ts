@@ -286,7 +286,6 @@ export class FrontPage extends MarkdownRenderChild {
 		const t = this.t;
 		const entries = this.savedEntries();
 		const section = root.createDiv({ cls: "mr-section mr-reading-list" });
-		section.style.setProperty("--mr-accent", "var(--interactive-accent)");
 
 		const back = section.createEl("a", { cls: "mr-back", href: "#", text: `← ${t.frontPage}` });
 		this.onPress(back, () => {
@@ -431,7 +430,8 @@ export class FrontPage extends MarkdownRenderChild {
 		setIcon(more, "more-horizontal");
 		this.onPress(more, (event) => this.menu(entry, inSaved).showAtMouseEvent(event));
 
-		body.createDiv({ cls: "mr-headline", text: article.title });
+		// The words sit in their own span, so the underline on hover follows every line of a long headline.
+		body.createDiv({ cls: "mr-headline" }).createSpan({ cls: "mr-headline-text", text: article.title });
 		if (this.plugin.settings.showSummaries && article.summary && variant !== "compact") {
 			body.createDiv({ cls: "mr-standfirst", text: article.summary });
 		}

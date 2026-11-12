@@ -68,6 +68,24 @@ const filters: FilterRegistry<ClipContext> = {
 
 const engine = createEngine<ClipContext>({ filters });
 
+/** A time from Obsidian's moment, as clipping uses it. */
+interface ClockTime {
+	format(pattern?: string): string;
+	isValid(): boolean;
+}
+
+/**
+ * Obsidian's moment, typed here for what clipping uses. Its own type declarations
+ * come with Obsidian's and do not resolve everywhere the plugin is type-checked.
+ */
+interface Clock {
+	(input?: Date | string, formats?: unknown[]): ClockTime;
+	ISO_8601: unknown;
+	RFC_2822: unknown;
+}
+
+const clock = moment as unknown as Clock;
+
 /** Interpreter prompts ({{"…"}}) need Web Clipper's AI connection; here they come out empty. */
 function withoutPrompts(text: string): string {
 	return text.replace(/\{\{-?\s*(?:prompt:\s*)?(["'])(?:\\.|(?!\1)[^\\])*\1\s*(?:\|[^}]*)?-?\}\}/g, "");
@@ -272,7 +290,7 @@ function buildVariables(
 	now?: Date,
 ): Record<string, string> {
 	const currentUrl = url.replace(/#:~:text=[^&]+(&|$)/, "");
-	const timestamp = moment(now ?? new Date()).format("YYYY-MM-DDTHH:mm:ssZ");
+	const timestamp = clock(now ?? new Date()).format("YYYY-MM-DDTHH:mm:ssZ");
 	const variables: Record<string, string> = {
 		"{{author}}": (page.author ?? "").trim(),
 		"{{content}}": markdown.trim(),
@@ -417,7 +435,7 @@ function formatPropertyValue(value: string, type: string, templateValue: string)
 		case "date":
 		case "datetime": {
 			if (!templateValue.includes("|date:") && value.trim()) {
-				const parsed = moment(value.trim(), [moment.ISO_8601, moment.RFC_2822]);
+				const parsed = clock(value.trim(), [clock.ISO_8601, clock.RFC_2822]);
 				if (parsed.isValid()) return parsed.format(type === "date" ? "YYYY-MM-DD" : "YYYY-MM-DDTHH:mm:ssZ");
 			}
 			return value;
@@ -570,7 +588,7 @@ async function dailyNote(app: App): Promise<TFile> {
 		).internalPlugins?.getPluginById?.("daily-notes")?.instance?.options ?? {};
 	const format = options.format || "YYYY-MM-DD";
 	const folder = (options.folder ?? "").replace(/^\/+|\/+$/g, "");
-	const name = moment().format(format);
+	const name = clock().format(format);
 	const path = normalizePath(`${folder ? `${folder}/` : ""}${name}.md`);
 	const existing = app.vault.getAbstractFileByPath(path);
 	if (existing instanceof TFile) return existing;
@@ -580,10 +598,10 @@ async function dailyNote(app: App): Promise<TFile> {
 	const templateFile = templatePath ? app.vault.getAbstractFileByPath(templatePath) : null;
 	if (templateFile instanceof TFile) {
 		text = (await app.vault.read(templateFile))
-			.replace(/{{\s*date\s*:(.*?)}}/gi, (_, f: string) => moment().format(f.trim()))
-			.replace(/{{\s*time\s*:(.*?)}}/gi, (_, f: string) => moment().format(f.trim()))
-			.replace(/{{\s*date\s*}}/gi, moment().format(format))
-			.replace(/{{\s*time\s*}}/gi, moment().format("HH:mm"))
+			.replace(/{{\s*date\s*:(.*?)}}/gi, (_, f: string) => clock().format(f.trim()))
+			.replace(/{{\s*time\s*:(.*?)}}/gi, (_, f: string) => clock().format(f.trim()))
+			.replace(/{{\s*date\s*}}/gi, clock().format(format))
+			.replace(/{{\s*time\s*}}/gi, clock().format("HH:mm"))
 			.replace(/{{\s*title\s*}}/gi, name);
 	}
 	await ensureFolder(app, path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "");

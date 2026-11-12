@@ -13,6 +13,10 @@ export default tseslint.config(
 	// Obsidian's official guideline rules, as the community-plugin review runs them.
 	// The recommended config carries its own file globs, so it is applied without narrowing.
 	...obsidianmd.configs.recommended,
+	// typescript-eslint's full type-checked set, as the community-plugin review runs it:
+	// it reports promise-like values where void is expected and untyped values that
+	// Obsidian's own recommended set lets through.
+	...tseslint.configs.recommendedTypeChecked.map((config) => ({ ...config, files: ["**/*.ts"] })),
 	{
 		// The type-aware rules need the TypeScript program.
 		files: ["**/*.ts"],

@@ -1,6 +1,6 @@
 {
 	"name": "magazine-rack",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "Obsidian plugin: a note with the latest articles from your magazines.",
 	"main": "main.js",
 	"private": true,
@@ -12,8 +12,8 @@
 	},
 	"scripts": {
 		"dev": "node esbuild.config.mjs",
-		"lint": "eslint .",
-		"build": "tsc -noEmit -skipLibCheck && eslint . --max-warnings=0 && node esbuild.config.mjs production"
+		"lint": "eslint . --max-warnings=0 && stylelint styles.css --max-warnings=0",
+		"build": "tsc -noEmit -skipLibCheck && npm run lint && node esbuild.config.mjs production"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",
@@ -22,8 +22,10 @@
 		"eslint": "^10.14.0",
 		"eslint-plugin-obsidianmd": "^0.5.1",
 		"obsidian": "latest",
+		"stylelint": "^18.0.0",
+		"stylelint-no-unsupported-browser-features": "^8.1.2",
 		"tslib": "2.4.0",
-		"typescript": "~5.9",
+		"typescript": "~6.0.3",
 		"typescript-eslint": "^8.72.2"
 	},
 	"dependencies": {

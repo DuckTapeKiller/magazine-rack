@@ -108,7 +108,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 			{
 				name: "Note",
 				desc: "Where the reading room lives. The note is made the first time you open it. In a note you already have, the page is added at the end and the rest is left alone. You can also put a magazine-rack code block in any note.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addText((text) =>
 						text
 							.setPlaceholder(DEFAULT_SETTINGS.notePath)
@@ -117,12 +117,13 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 								settings.notePath = value;
 								await this.plugin.savePluginData();
 							}),
-					),
+					);
+				},
 			},
 			{
 				name: "Page title",
 				desc: "The name across the top of the page.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addText((text) =>
 						text
 							.setPlaceholder(DEFAULT_SETTINGS.title)
@@ -132,7 +133,8 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 								await this.plugin.savePluginData();
 								this.plugin.refreshViews();
 							}),
-					),
+					);
+				},
 			},
 			{
 				name: "Articles per magazine",
@@ -158,7 +160,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 			{
 				name: "Check for new articles",
 				desc: "Only while Obsidian is open. It also checks when Obsidian starts, if the last check is older than this.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addDropdown((dropdown) =>
 						dropdown
 							.addOptions(INTERVALS)
@@ -168,24 +170,26 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 								await this.plugin.savePluginData();
 								this.plugin.refreshViews();
 							}),
-					),
+					);
+				},
 			},
 			{
 				name: "Show standfirsts",
 				desc: "The short introduction under each headline, where the feed gives one.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addToggle((toggle) =>
 						toggle.setValue(settings.showSummaries).onChange(async (value) => {
 							settings.showSummaries = value;
 							await this.plugin.savePluginData();
 							this.plugin.refreshViews();
 						}),
-					),
+					);
+				},
 			},
 			{
 				name: "Keep articles for",
 				desc: "Feeds only hold their newest pieces, so an article can vanish within hours. This keeps it on the page for a while after it leaves the feed.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addDropdown((dropdown) =>
 						dropdown
 							.addOptions({
@@ -201,12 +205,13 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 								settings.historyDays = Number(value);
 								await this.plugin.savePluginData();
 							}),
-					),
+					);
+				},
 			},
 			{
 				name: "Language of the page",
 				desc: "For the dates, labels and menus on the page. These settings stay in English.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addDropdown((dropdown) =>
 						dropdown
 							.addOptions({ en: "English", es: "Español" })
@@ -216,23 +221,25 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 								await this.plugin.savePluginData();
 								this.plugin.refreshViews();
 							}),
-					),
+					);
+				},
 			},
 			{
 				name: "Always open in reading view",
 				desc: "Switches the note to reading view each time you open it. If you switch to editing on purpose, it stays that way until you open the note again.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addToggle((toggle) =>
 						toggle.setValue(settings.alwaysReading).onChange(async (value) => {
 							settings.alwaysReading = value;
 							await this.plugin.savePluginData();
 						}),
-					),
+					);
+				},
 			},
 			{
 				name: "Check now",
 				desc: this.plugin.lastCheck ? `Last checked ${formatStamp(this.plugin.lastCheck)}.` : "Not checked yet.",
-				render: (setting) =>
+				render: (setting) => {
 					setting
 						.addButton((button) =>
 							button
@@ -248,7 +255,8 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 							button.setButtonText("Open the note").onClick(async () => {
 								await this.plugin.openNote();
 							}),
-						),
+						);
+				},
 			},
 		];
 	}
@@ -441,7 +449,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 			rows.push({
 				name: template === fallback ? `${template.name} (used when no trigger matches)` : template.name,
 				desc: `${where}${triggers}`,
-				render: (setting) =>
+				render: (setting) => {
 					setting
 						.addExtraButton((button) =>
 							button
@@ -468,7 +476,8 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 										this.refresh();
 									}).open();
 								}),
-						),
+						);
+				},
 			});
 		});
 
@@ -476,7 +485,7 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 			{
 				name: "",
 				searchable: false,
-				render: (setting) =>
+				render: (setting) => {
 					setting
 						.addButton((button) =>
 							button
@@ -494,18 +503,20 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 							button.setButtonText("Paste a template").onClick(() => {
 								new PasteModal(this.app, async (text) => this.importTemplates([text])).open();
 							}),
-						),
+						);
+				},
 			},
 			{
 				name: "Open the note after clipping",
 				desc: "Opens the new note in a new tab. Otherwise a message says where it went, with a link to open it.",
-				render: (setting) =>
+				render: (setting) => {
 					setting.addToggle((toggle) =>
 						toggle.setValue(settings.openAfterClip).onChange(async (value) => {
 							settings.openAfterClip = value;
 							await this.plugin.savePluginData();
 						}),
-					),
+					);
+				},
 			},
 		);
 		return rows;

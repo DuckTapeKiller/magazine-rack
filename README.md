@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://github.com/DuckTapeKiller/magazine-rack/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/DuckTapeKiller/magazine-rack?style=flat-square&label=release&color=7a5c99"></a>
-  <img alt="Obsidian 1.4 or later" src="https://img.shields.io/badge/Obsidian-1.4%2B-483699?style=flat-square&logo=obsidian&logoColor=white">
+  <img alt="Obsidian 1.4.4 or later" src="https://img.shields.io/badge/Obsidian-1.4.4%2B-483699?style=flat-square&logo=obsidian&logoColor=white">
   <img alt="Desktop and mobile" src="https://img.shields.io/badge/desktop%20%26%20mobile-supported-3d7a5a?style=flat-square">
   <img alt="English and Spanish" src="https://img.shields.io/badge/page-English%20%C2%B7%20Espa%C3%B1ol-b5543a?style=flat-square">
   <a href="https://ko-fi.com/ducktapekiller"><img alt="Support on Ko-fi" src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?style=flat-square&logo=ko-fi&logoColor=white"></a>

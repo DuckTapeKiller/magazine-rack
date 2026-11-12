@@ -268,7 +268,7 @@ export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 			},
 			(error: unknown) => {
 				window.clearTimeout(timer);
-				reject(error instanceof Error ? error : new Error(String(error)));
+				reject(error instanceof Error ? error : new Error("the request failed"));
 			},
 		);
 	});

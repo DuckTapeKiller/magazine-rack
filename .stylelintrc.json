@@ -1,0 +1,19 @@
+{
+	"plugins": ["stylelint-no-unsupported-browser-features"],
+	"rules": {
+		"plugin/no-unsupported-browser-features": [
+			true,
+			{
+				"browsers": ["chrome 114"],
+				"severity": "warning"
+			}
+		],
+		"selector-pseudo-class-disallowed-list": [
+			["has"],
+			{
+				"message": "Avoid :has: it can cause broad selector invalidation (Obsidian's review reports it).",
+				"severity": "warning"
+			}
+		]
+	}
+}

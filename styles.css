@@ -503,9 +503,10 @@
 	display: none;
 }
 
-.mr-kicker-name:not(.is-tagged):has(+ .mr-kicker-time)::after {
+/* A dot between the magazine's name and the time, where both show. */
+.mr-kicker-name:not(.is-tagged) + .mr-kicker-time::before {
 	content: "·";
-	margin-left: 0.6em;
+	margin-right: 0.6em;
 }
 
 .mr-new {
@@ -528,10 +529,14 @@
 	line-height: 1.24;
 	color: var(--mr-ink);
 	text-wrap: pretty;
-	text-decoration-line: none;
-	text-decoration-color: var(--mr-accent);
-	text-decoration-thickness: 1.5px;
-	text-underline-offset: 0.18em;
+}
+
+/* The underline on hover, in the magazine's colour, drawn as a background so it runs under every line. */
+.mr-headline-text {
+	background-image: linear-gradient(var(--mr-accent), var(--mr-accent));
+	background-position: 0 100%;
+	background-repeat: no-repeat;
+	background-size: 0 1.5px;
 }
 
 .mr-standfirst {
@@ -560,9 +565,9 @@
 	white-space: nowrap;
 }
 
-.mr-meta-item:has(+ .mr-meta-item)::after {
+.mr-meta-item + .mr-meta-item::before {
 	content: "·";
-	margin-left: 0.7em;
+	margin-right: 0.7em;
 }
 
 .mr-read-mark {
@@ -595,8 +600,8 @@
 		transform: scale(1.045);
 	}
 
-	.mr-card:hover .mr-headline {
-		text-decoration-line: underline;
+	.mr-card:hover .mr-headline-text {
+		background-size: 100% 1.5px;
 	}
 }
 
@@ -707,7 +712,11 @@
 	height: 0.8em;
 }
 
-/* The reading list: a page of its own, with the way back above its heading. */
+/* The reading list: a page of its own, in the theme's accent, with the way back above its heading. */
+.mr-reading-list {
+	--mr-accent: var(--interactive-accent);
+}
+
 .mr-page a.mr-back {
 	display: inline-block;
 	margin-bottom: 1.2em;
@@ -796,7 +805,6 @@
 		flex-wrap: nowrap;
 		justify-content: flex-start;
 		overflow-x: auto;
-		scrollbar-width: none;
 		margin: 0 -2px;
 	}
 
@@ -867,9 +875,9 @@
 		display: inline;
 	}
 
-	.mr-grid .mr-card:not(.mr-feature) .mr-kicker-name.is-tagged:has(+ .mr-kicker-time)::after {
+	.mr-grid .mr-card:not(.mr-feature) .mr-kicker-name.is-tagged + .mr-kicker-time::before {
 		content: "·";
-		margin-left: 0.6em;
+		margin-right: 0.6em;
 	}
 }
 

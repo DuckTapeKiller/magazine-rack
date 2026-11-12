@@ -43,3 +43,8 @@ jobs:
 
       - name: Lint (official Obsidian rules)
         run: npx eslint . --max-warnings=0
+
+      # The review also checks styles.css against the Chromium of the oldest
+      # Obsidian the manifest allows (1.4.x: Chrome 114) and reports :has.
+      - name: Lint CSS (browser support, as the review checks it)
+        run: npx stylelint styles.css --max-warnings=0
