@@ -1,0 +1,778 @@
+/* ============================================================
+   Magazine Rack: the reading room front page
+   Colours come from the theme, so the page follows light and dark.
+   ============================================================ */
+
+/* The note that holds the page: wider than prose, no title or properties above the masthead. */
+.magazine-rack-page {
+	--file-line-width: 1240px;
+}
+
+.magazine-rack-page .inline-title,
+.markdown-preview-view.magazine-rack-page.show-properties .metadata-container,
+.markdown-source-view.is-live-preview.show-properties.magazine-rack-page .metadata-container {
+	display: none;
+}
+
+.mr-page {
+	--mr-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Charter, Georgia, serif;
+	--mr-sans: var(--font-interface);
+	--mr-ink: var(--text-normal);
+	--mr-muted: var(--text-muted);
+	--mr-faint: var(--text-faint);
+	--mr-rule: var(--background-modifier-border);
+	--mr-radius: 10px;
+	container: mr / inline-size;
+	padding-bottom: 3em;
+	font-size: var(--font-text-size);
+	line-height: 1.4;
+}
+
+.mr-page a,
+.mr-page a:hover {
+	color: inherit;
+	text-decoration: none;
+}
+
+/* ---------- Masthead ---------- */
+
+.mr-masthead {
+	text-align: center;
+	padding: 1.2em 0 1em;
+	margin-bottom: 1.1em;
+	border-bottom: 3px double color-mix(in srgb, var(--mr-ink) 55%, transparent);
+}
+
+.mr-dateline {
+	font: 600 0.7em/1.2 var(--mr-sans);
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--mr-muted);
+}
+
+.mr-title {
+	font-family: var(--mr-serif);
+	font-weight: 700;
+	font-size: clamp(2.1em, 7cqi, 3.6em);
+	line-height: 1.02;
+	letter-spacing: -0.015em;
+	margin: 0.22em 0 0.28em;
+	color: var(--mr-ink);
+}
+
+.mr-status {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.4em;
+	font: 0.8em/1.3 var(--mr-sans);
+	color: var(--mr-muted);
+}
+
+.mr-page button.mr-refresh {
+	padding: 4px;
+	height: auto;
+	color: var(--mr-muted);
+}
+
+.mr-page button.mr-refresh:hover {
+	color: var(--mr-ink);
+}
+
+.mr-refresh svg {
+	width: 15px;
+	height: 15px;
+}
+
+.mr-refresh.is-spinning svg {
+	animation: mr-spin 1s linear infinite;
+}
+
+@keyframes mr-spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* ---------- Magazine chips ---------- */
+
+.mr-chips {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 8px;
+	padding: 2px 2px 1.2em;
+}
+
+.mr-page button.mr-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	height: auto;
+	padding: 6px 13px;
+	border-radius: 999px;
+	border: 1px solid var(--mr-rule);
+	background: var(--background-primary);
+	box-shadow: none;
+	color: var(--mr-muted);
+	font: 500 0.8em/1.2 var(--mr-sans);
+	white-space: nowrap;
+	cursor: pointer;
+	transition:
+		color 0.15s ease,
+		border-color 0.15s ease,
+		background-color 0.15s ease;
+}
+
+.mr-page button.mr-chip:hover {
+	color: var(--mr-ink);
+	border-color: color-mix(in srgb, var(--mr-ink) 35%, transparent);
+}
+
+.mr-page button.mr-chip.is-active {
+	background: var(--mr-ink);
+	border-color: var(--mr-ink);
+	color: var(--background-primary);
+}
+
+.mr-chip-dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: var(--mr-accent);
+	flex: none;
+}
+
+.mr-chip-count {
+	min-width: 1.5em;
+	padding: 0 0.4em;
+	border-radius: 999px;
+	background: var(--mr-accent);
+	color: #fff;
+	font-size: 0.85em;
+	font-weight: 700;
+	line-height: 1.5;
+	text-align: center;
+}
+
+/* ---------- Section labels ---------- */
+
+.mr-label {
+	display: flex;
+	align-items: center;
+	gap: 0.9em;
+	margin: 0.3em 0 1.1em;
+	font: 700 0.72em/1 var(--mr-sans);
+	letter-spacing: 0.16em;
+	text-transform: uppercase;
+	color: var(--mr-ink);
+}
+
+.mr-label::after {
+	content: "";
+	flex: 1;
+	height: 1px;
+	background: var(--mr-rule);
+}
+
+/* ---------- Just in ---------- */
+
+.mr-justin-layout {
+	display: grid;
+	gap: 1.6em;
+}
+
+.mr-justin-side {
+	display: flex;
+	flex-direction: column;
+}
+
+@container mr (min-width: 720px) {
+	.mr-justin-layout {
+		grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+		align-items: start;
+	}
+}
+
+/* ---------- Cards ---------- */
+
+.mr-page a.mr-card {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	border-radius: var(--mr-radius);
+	cursor: pointer;
+	outline-offset: 4px;
+}
+
+.mr-page a.mr-card:focus-visible {
+	outline: 2px solid var(--mr-accent);
+}
+
+.mr-media {
+	position: relative;
+	aspect-ratio: 3 / 2;
+	border-radius: var(--mr-radius);
+	overflow: hidden;
+	background: color-mix(in srgb, var(--mr-accent) 14%, var(--background-secondary));
+	container-type: inline-size;
+	isolation: isolate;
+}
+
+.mr-media img {
+	display: block;
+	width: 100%;
+	height: 100%;
+	max-width: none;
+	margin: 0;
+	border-radius: 0;
+	object-fit: cover;
+	opacity: 0;
+	transform: scale(1.01);
+	pointer-events: none;
+	transition:
+		opacity 0.45s ease,
+		transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.mr-media.is-loaded img {
+	opacity: 1;
+}
+
+.mr-media.no-fade img {
+	transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* A plate for articles without a picture: the magazine's initials on its colour. */
+.mr-monogram {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--mr-serif);
+	font-weight: 700;
+	font-size: clamp(1.2em, 20cqi, 4.2em);
+	letter-spacing: 0.04em;
+	color: rgba(255, 255, 255, 0.94);
+	background: radial-gradient(
+		130% 120% at 18% 8%,
+		color-mix(in srgb, var(--mr-accent) 62%, #fff) 0%,
+		var(--mr-accent) 46%,
+		color-mix(in srgb, var(--mr-accent) 62%, #000) 100%
+	);
+}
+
+.mr-monogram::after {
+	content: "";
+	position: absolute;
+	inset: clamp(5px, 4cqi, 12px);
+	border: 1px solid rgba(255, 255, 255, 0.35);
+	border-radius: 6px;
+}
+
+.mr-body {
+	min-width: 0;
+	padding-top: 0.75em;
+}
+
+.mr-kicker {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 0.6em;
+	font: 700 0.66em/1.3 var(--mr-sans);
+	letter-spacing: 0.13em;
+	text-transform: uppercase;
+	color: color-mix(in srgb, var(--mr-accent) 78%, var(--mr-ink));
+}
+
+/* The magazine's name on the picture */
+.mr-tag {
+	position: absolute;
+	top: 10px;
+	left: 10px;
+	z-index: 1;
+	max-width: calc(100% - 20px);
+	overflow: hidden;
+	padding: 0.32em 0.7em;
+	border-radius: 999px;
+	background: var(--mr-accent);
+	box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+	color: #fff;
+	font: 700 0.62em/1.2 var(--mr-sans);
+	letter-spacing: 0.1em;
+	text-transform: uppercase;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.mr-hero .mr-tag {
+	top: 14px;
+	left: 14px;
+	font-size: 0.7em;
+}
+
+.mr-card.is-read .mr-tag {
+	opacity: 0.8;
+}
+
+/* On wide cards the tag names the magazine, so the label line shows only the time. */
+.mr-kicker-name.is-tagged {
+	display: none;
+}
+
+.mr-kicker-name:not(.is-tagged):has(+ .mr-kicker-time)::after {
+	content: "·";
+	margin-left: 0.6em;
+}
+
+.mr-new {
+	padding: 0.2em 0.6em;
+	border-radius: 999px;
+	background: var(--mr-accent);
+	color: #fff;
+	letter-spacing: 0.08em;
+}
+
+.mr-headline {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 3;
+	overflow: hidden;
+	margin-top: 0.4em;
+	font-family: var(--mr-serif);
+	font-weight: 650;
+	font-size: 1.12em;
+	line-height: 1.24;
+	color: var(--mr-ink);
+	text-wrap: pretty;
+	text-decoration-line: none;
+	text-decoration-color: var(--mr-accent);
+	text-decoration-thickness: 1.5px;
+	text-underline-offset: 0.18em;
+}
+
+.mr-standfirst {
+	display: -webkit-box;
+	-webkit-box-orient: vertical;
+	-webkit-line-clamp: 2;
+	overflow: hidden;
+	margin-top: 0.45em;
+	font-size: 0.88em;
+	line-height: 1.5;
+	color: var(--mr-muted);
+	text-wrap: pretty;
+}
+
+.mr-meta {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.3em 0.7em;
+	margin-top: 0.6em;
+	font: 0.74em/1.3 var(--mr-sans);
+	color: var(--mr-faint);
+}
+
+.mr-meta-item {
+	white-space: nowrap;
+}
+
+.mr-meta-item:has(+ .mr-meta-item)::after {
+	content: "·";
+	margin-left: 0.7em;
+}
+
+.mr-read-mark {
+	display: none;
+	padding: 0.1em 0.55em;
+	border-radius: 999px;
+	border: 1px solid var(--mr-rule);
+}
+
+.mr-read-mark::before {
+	content: "✓ ";
+}
+
+.mr-card.is-read .mr-read-mark {
+	display: inline-block;
+}
+
+.mr-card.is-read .mr-media {
+	opacity: 0.55;
+	filter: grayscale(0.7);
+}
+
+.mr-card.is-read .mr-headline,
+.mr-card.is-read .mr-kicker {
+	color: var(--mr-muted);
+}
+
+@media (hover: hover) {
+	.mr-card:hover .mr-media img {
+		transform: scale(1.045);
+	}
+
+	.mr-card:hover .mr-headline {
+		text-decoration-line: underline;
+	}
+}
+
+/* The newest piece on the page */
+.mr-hero .mr-media {
+	aspect-ratio: 16 / 9;
+	border-radius: 14px;
+}
+
+.mr-hero .mr-body {
+	padding-top: 1em;
+}
+
+.mr-hero .mr-headline {
+	-webkit-line-clamp: 4;
+	font-size: clamp(1.4em, 3.2cqi, 1.9em);
+	line-height: 1.12;
+	letter-spacing: -0.01em;
+}
+
+.mr-hero .mr-standfirst {
+	-webkit-line-clamp: 3;
+	font-size: 1em;
+}
+
+/* Small rows beside the hero */
+.mr-page a.mr-compact {
+	border-radius: 0;
+	flex-direction: row;
+	align-items: flex-start;
+	gap: 0.9em;
+	padding: 0.85em 0;
+	border-bottom: 1px solid var(--mr-rule);
+}
+
+.mr-page a.mr-compact:first-child {
+	padding-top: 0;
+}
+
+.mr-page a.mr-compact:last-child {
+	border-bottom: 0;
+}
+
+.mr-compact .mr-media {
+	flex: none;
+	width: 92px;
+	aspect-ratio: 1;
+	border-radius: 8px;
+}
+
+.mr-compact .mr-body {
+	padding-top: 0;
+}
+
+.mr-compact .mr-headline {
+	font-size: 1em;
+}
+
+/* ---------- Magazine sections ---------- */
+
+.mr-justin + .mr-section,
+.mr-section + .mr-section {
+	margin-top: 2.8em;
+}
+
+.mr-section-head {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 1em;
+	margin-bottom: 1.2em;
+	padding-top: 0.55em;
+	border-top: 3px solid var(--mr-accent);
+}
+
+.mr-section-name {
+	font-family: var(--mr-serif);
+	font-weight: 700;
+	font-size: 1.6em;
+	line-height: 1.15;
+	letter-spacing: -0.01em;
+	color: var(--mr-ink);
+}
+
+.mr-page a.mr-section-link {
+	flex: none;
+	font: 500 0.78em/1.2 var(--mr-sans);
+	color: var(--mr-muted);
+}
+
+.mr-page a.mr-section-link:hover {
+	color: color-mix(in srgb, var(--mr-accent) 78%, var(--mr-ink));
+}
+
+.mr-warning {
+	margin-bottom: 1em;
+	padding: 0.6em 0.9em;
+	border-radius: 8px;
+	background: color-mix(in srgb, var(--text-warning) 10%, transparent);
+	color: var(--text-warning);
+	font: 0.82em/1.4 var(--mr-sans);
+}
+
+.mr-grid {
+	display: grid;
+	gap: 1.9em 1.4em;
+	grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr));
+}
+
+/* The magazine's newest piece leads its section, picture beside the words. */
+@container mr (min-width: 640px) {
+	.mr-page a.mr-feature {
+		grid-column: 1 / -1;
+		display: grid;
+		grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+		gap: 1.6em;
+		align-items: center;
+		border-radius: 0;
+		padding-bottom: 1.9em;
+		border-bottom: 1px solid var(--mr-rule);
+	}
+
+	.mr-feature .mr-media {
+		aspect-ratio: 16 / 10;
+	}
+
+	.mr-feature .mr-body {
+		padding-top: 0;
+	}
+
+	.mr-feature .mr-headline {
+		-webkit-line-clamp: 4;
+		font-size: clamp(1.35em, 2.6cqi, 1.8em);
+		line-height: 1.15;
+	}
+
+	.mr-feature .mr-standfirst {
+		-webkit-line-clamp: 4;
+		font-size: 0.98em;
+	}
+}
+
+/* Narrow panes and phones: one column, rows with a thumbnail. */
+@container mr (max-width: 519px) {
+	.mr-title {
+		font-size: 2.3em;
+	}
+
+	.mr-section-head {
+		flex-direction: column;
+		gap: 0.25em;
+	}
+
+	.mr-section-name {
+		font-size: 1.45em;
+	}
+
+	.mr-chips {
+		flex-wrap: nowrap;
+		justify-content: flex-start;
+		overflow-x: auto;
+		scrollbar-width: none;
+		margin: 0 -2px;
+	}
+
+	.mr-chips::-webkit-scrollbar {
+		display: none;
+	}
+
+	.mr-grid {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0;
+	}
+
+	.mr-page a.mr-feature {
+		border-radius: 0;
+		padding-bottom: 1em;
+		border-bottom: 1px solid var(--mr-rule);
+	}
+
+	.mr-page .mr-grid a.mr-card:not(.mr-feature) {
+		border-radius: 0;
+		flex-direction: row;
+		align-items: flex-start;
+		gap: 0.9em;
+		padding: 0.9em 0;
+		border-bottom: 1px solid var(--mr-rule);
+	}
+
+	.mr-page .mr-grid a.mr-card:last-child {
+		border-bottom: 0;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-media {
+		flex: none;
+		width: 96px;
+		aspect-ratio: 1;
+		border-radius: 8px;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-body {
+		padding-top: 0;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-headline {
+		font-size: 1em;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-standfirst {
+		display: none;
+	}
+
+	/* Thumbnails are too small for a tag: the name moves to the label line. */
+	.mr-grid .mr-card:not(.mr-feature) .mr-tag {
+		display: none;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-kicker-name.is-tagged {
+		display: inline;
+	}
+
+	.mr-grid .mr-card:not(.mr-feature) .mr-kicker-name.is-tagged:has(+ .mr-kicker-time)::after {
+		content: "·";
+		margin-left: 0.6em;
+	}
+}
+
+.mr-empty {
+	padding: 3em 1em;
+	text-align: center;
+	font-family: var(--mr-serif);
+	font-size: 1.1em;
+	font-style: italic;
+	color: var(--mr-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.mr-media img {
+		transition: none;
+	}
+
+	.mr-card:hover .mr-media img {
+		transform: none;
+	}
+}
+
+/* ---------- Settings ---------- */
+
+.magazine-rack-swatch {
+	display: inline-block;
+	width: 10px;
+	height: 10px;
+	margin-right: 8px;
+	border-radius: 50%;
+	background: var(--mr-accent);
+	vertical-align: middle;
+}
+
+.magazine-rack-desc .magazine-rack-feeds {
+	white-space: pre-wrap;
+	word-break: break-all;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+}
+
+.magazine-rack-desc .magazine-rack-error {
+	color: var(--text-error);
+}
+
+.magazine-rack-feeds-setting {
+	flex-wrap: wrap;
+}
+
+.magazine-rack-feeds-setting .setting-item-control {
+	flex: 1 1 100%;
+}
+
+.magazine-rack-feeds-setting textarea {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+}
+
+.magazine-rack-guide {
+	margin: 0 0 1em;
+	padding: 0.9em 1.1em;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background: var(--background-secondary);
+	font-size: var(--font-ui-small);
+	line-height: 1.5;
+	color: var(--text-muted);
+}
+
+.magazine-rack-guide-title {
+	margin-bottom: 0.3em;
+	font-weight: var(--font-semibold);
+	color: var(--text-normal);
+}
+
+.magazine-rack-guide p {
+	margin: 0.3em 0;
+}
+
+.magazine-rack-guide ol {
+	margin: 0.5em 0;
+	padding-left: 1.4em;
+}
+
+.magazine-rack-guide li {
+	margin: 0.25em 0;
+}
+
+.magazine-rack-guide strong {
+	color: var(--text-normal);
+}
+
+.magazine-rack-guide-note {
+	font-size: var(--font-ui-smaller);
+}
+
+.magazine-rack-modal-intro {
+	margin-top: 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+}
+
+.magazine-rack-test-results:empty {
+	display: none;
+}
+
+.magazine-rack-test-results {
+	display: flex;
+	flex-direction: column;
+	gap: 0.5em;
+	margin: 0.2em 0 1em;
+}
+
+.magazine-rack-test {
+	padding: 0.55em 0.8em;
+	border-radius: var(--radius-s);
+	border-left: 3px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	font-size: var(--font-ui-small);
+	line-height: 1.45;
+}
+
+.magazine-rack-test.is-good {
+	border-left-color: var(--color-green);
+}
+
+.magazine-rack-test.is-bad {
+	border-left-color: var(--color-red);
+}
+
+.magazine-rack-test-url {
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
+	color: var(--text-faint);
+	word-break: break-all;
+}

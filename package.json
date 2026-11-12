@@ -1,0 +1,18 @@
+{
+	"name": "magazine-rack",
+	"version": "1.0.0",
+	"description": "Obsidian plugin: a note with the latest articles from your magazines.",
+	"main": "main.js",
+	"private": true,
+	"scripts": {
+		"dev": "node esbuild.config.mjs",
+		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+	},
+	"devDependencies": {
+		"@types/node": "^16.11.6",
+		"esbuild": "^0.28.0",
+		"obsidian": "latest",
+		"tslib": "2.4.0",
+		"typescript": "4.9.5"
+	}
+}
