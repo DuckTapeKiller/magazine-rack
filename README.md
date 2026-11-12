@@ -3,7 +3,7 @@
 <p align="center"><strong>The Reading Room: a front page for the magazines you read, inside Obsidian.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/CasaAmarillaRoja/reading_room/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/CasaAmarillaRoja/reading_room?style=flat-square&label=release&color=7a5c99"></a>
+  <a href="https://github.com/CasaAmarillaRoja/magazine-rack/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/CasaAmarillaRoja/magazine-rack?style=flat-square&label=release&color=7a5c99"></a>
   <img alt="Obsidian 1.4 or later" src="https://img.shields.io/badge/Obsidian-1.4%2B-483699?style=flat-square&logo=obsidian&logoColor=white">
   <img alt="Desktop and mobile" src="https://img.shields.io/badge/desktop%20%26%20mobile-supported-3d7a5a?style=flat-square">
   <img alt="English and Spanish" src="https://img.shields.io/badge/page-English%20%C2%B7%20Espa%C3%B1ol-b5543a?style=flat-square">
@@ -156,9 +156,9 @@ The articles, your saved list and what you have read are kept in the plugin's da
 
 ## Install
 
-**With BRAT.** Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin, choose *Add beta plugin*, and enter `CasaAmarillaRoja/reading_room`.
+**With BRAT.** Install the [BRAT](https://github.com/TfTHacker/obsidian42-brat) plugin, choose *Add beta plugin*, and enter `CasaAmarillaRoja/magazine-rack`.
 
-**By hand.** Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/CasaAmarillaRoja/reading_room/releases/latest) into `<your vault>/.obsidian/plugins/magazine-rack/`.
+**By hand.** Download `main.js`, `manifest.json` and `styles.css` from the [latest release](https://github.com/CasaAmarillaRoja/magazine-rack/releases/latest) into `<your vault>/.obsidian/plugins/magazine-rack/`.
 
 Then switch on **Magazine Rack** in Settings → Community plugins, and click the newspaper icon in the left ribbon.
 
