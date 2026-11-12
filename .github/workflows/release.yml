@@ -1,0 +1,68 @@
+name: Release
+
+# Publish a release whose tag is the manifest's version (gh release create 1.0.1 --notes-file …),
+# without files: this builds the plugin from the tagged source, attests what it built, and
+# attaches main.js, manifest.json and styles.css to the release.
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: The tag is the manifest's version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          if [ "$TAG" != "$version" ]; then
+            echo "::error::The tag is $TAG but manifest.json says $version."
+            exit 1
+          fi
+
+      # Obsidian's lint must be the newest release: the community review runs the current rules.
+      - name: Obsidian lint plugin is the latest release
+        run: |
+          installed=$(node -p "require('eslint-plugin-obsidianmd/package.json').version")
+          latest=$(npm view eslint-plugin-obsidianmd version)
+          if [ "$installed" != "$latest" ]; then
+            echo "::error::eslint-plugin-obsidianmd $installed is behind $latest."
+            exit 1
+          fi
+
+      # Type check, Obsidian's lint, the CSS check and the production bundle.
+      - name: Build
+        run: npm run build
+
+      - name: Attest build provenance
+        uses: actions/attest@v4
+        with:
+          subject-path: |
+            main.js
+            manifest.json
+            styles.css
+
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" main.js manifest.json styles.css --clobber --repo "$GITHUB_REPOSITORY"

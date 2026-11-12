@@ -184,6 +184,8 @@ Then switch on **Magazine Rack** in Settings → Community plugins, and click th
 
 Magazine Rack talks only to the magazines you list: their feeds, their article pages (for pictures, and when you clip an article) and their image servers. It has no account, no analytics and no server of its own. What it keeps is stored in the plugin's data file inside your vault.
 
+It writes to the clipboard only when you choose *Copy link* in a card's menu, and then only the article's web address. It never reads the clipboard.
+
 ## Support
 
 Magazine Rack is free and open source. If it is useful to you, you can support its development on [Ko-fi](https://ko-fi.com/ducktapekiller): there is a small heart, beating softly, in the corner of the page's masthead, and a *Support* section at the end of the settings.
@@ -199,6 +201,8 @@ npm run build
 ```
 
 This type-checks the code, runs Obsidian's official plugin lint ([eslint-plugin-obsidianmd](https://github.com/obsidianmd/eslint-plugin)) with no warnings allowed, and writes `main.js` next to `manifest.json` and `styles.css`. `npm run lint` runs the lint alone.
+
+Each release's `main.js`, `manifest.json` and `styles.css` are built by GitHub Actions from the tagged source and carry an artifact attestation, so you can check where a file came from with `gh attestation verify main.js --repo DuckTapeKiller/magazine-rack`.
 
 Magazine Rack bundles Defuddle, Knap and Day.js, and Defuddle's full build includes Turndown and mathml-to-latex. All are MIT-licensed; see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
