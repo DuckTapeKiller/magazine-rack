@@ -1,8 +1,9 @@
-import { App, Modal, Notice, PluginSettingTab, Setting } from "obsidian";
+import { App, Modal, Notice, PluginSettingTab, Setting, setIcon } from "obsidian";
+import { fallbackTemplate, parseTemplates } from "./clip";
 import { discoverFeeds, fetchFeed } from "./feeds";
 import type MagazineRack from "./main";
 import { formatStamp } from "./view";
-import { PALETTE, copyDefaults, type Magazine } from "./types";
+import { DEFAULT_CLIP_TEMPLATE, KOFI_URL, PALETTE, copyDefaults, type ClipTemplate, type Magazine } from "./types";
 
 const INTERVALS: Record<string, string> = {
 	"15": "Every 15 minutes",
@@ -91,6 +92,50 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 					settings.showSummaries = value;
 					await this.plugin.savePluginData();
 					this.plugin.refreshViews();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Keep articles for")
+			.setDesc("Feeds only hold their newest pieces, so an article can vanish within hours. This keeps it on the page for a while after it leaves the feed.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({
+						"0": "Only while it is in the feed",
+						"1": "1 day",
+						"3": "3 days",
+						"7": "A week",
+						"14": "Two weeks",
+						"30": "A month",
+					})
+					.setValue(String(settings.historyDays))
+					.onChange(async (value) => {
+						settings.historyDays = Number(value);
+						await this.plugin.savePluginData();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Language of the page")
+			.setDesc("For the dates, labels and menus on the page. These settings stay in English.")
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOptions({ en: "English", es: "Español" })
+					.setValue(settings.language)
+					.onChange(async (value) => {
+						settings.language = value === "es" ? "es" : "en";
+						await this.plugin.savePluginData();
+						this.plugin.refreshViews();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Always open in reading view")
+			.setDesc("Switches the note to reading view each time you open it. If you switch to editing on purpose, it stays that way until you open the note again.")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.alwaysReading).onChange(async (value) => {
+					settings.alwaysReading = value;
+					await this.plugin.savePluginData();
 				}),
 			);
 
@@ -211,6 +256,165 @@ export class MagazineRackSettingTab extends PluginSettingTab {
 				}),
 			);
 		}
+
+		this.clipSection(containerEl);
+		this.supportSection(containerEl);
+	}
+
+	/** Support, laid out as in DuckTapeKiller's other plugins. */
+	private supportSection(containerEl: HTMLElement): void {
+		const name = this.plugin.manifest.name;
+		new Setting(containerEl).setName("Support").setHeading();
+		const el = containerEl.createDiv({ cls: "setting-item magazine-rack-support" });
+		setIcon(el.createDiv({ cls: "magazine-rack-support-icon" }), "heart");
+		const text = el.createDiv({ cls: "magazine-rack-support-text" });
+		text.createDiv({ cls: "magazine-rack-support-title", text: `Enjoying ${name}?` });
+		const about = text.createEl("p", {
+			text: `${name} is free and open source, made and maintained by DuckTapeKiller. If it is useful to you, you can support its development on `,
+		});
+		// The name stays on one line, so a narrow screen never breaks it at its hyphen.
+		about.createSpan({ cls: "magazine-rack-support-nowrap", text: "Ko-fi" });
+		about.appendText(".");
+		const kofi = el.createEl("a", {
+			cls: "magazine-rack-support-button",
+			href: KOFI_URL,
+			attr: { "aria-label": "Support DuckTapeKiller on Ko-fi" },
+		});
+		setIcon(kofi.createSpan({ cls: "magazine-rack-support-button-icon" }), "coffee");
+		kofi.createSpan({ text: "Support on Ko-fi" });
+	}
+
+	/** Clipping articles with Web Clipper templates. */
+	private clipSection(containerEl: HTMLElement): void {
+		const settings = this.plugin.settings;
+		new Setting(containerEl).setName("Clip to vault").setHeading();
+
+		const box = containerEl.createDiv({ cls: "magazine-rack-guide" });
+		box.createEl("p", {
+			text: "The scissors on each article (or Clip to vault in its menu) save the article as a note, using your Obsidian Web Clipper templates: the same folder, note name, properties and content as in your browser.",
+		});
+		const steps = box.createEl("ol");
+		const step = (strong: string, rest: string) => {
+			const li = steps.createEl("li");
+			li.createEl("strong", { text: strong });
+			li.appendText(` ${rest}`);
+		};
+		step("Export a template from Web Clipper:", "open its settings, choose the template, then Export (or More → Copy to clipboard).");
+		step(
+			"Import it here",
+			"with the button below, or paste it. You can import several: each one’s triggers choose it by web address, as in Web Clipper. When none match, the first template without triggers is used, or Web Clipper’s default.",
+		);
+		box.createEl("p", {
+			cls: "magazine-rack-guide-note",
+			text: "The article is read without your browser’s sign-in, so paywalled magazines may give only the first paragraphs; for those, open the article and use Web Clipper in your browser. Interpreter prompts are left empty, and anything a page draws with scripts after it loads (some prices, for example) may be missing.",
+		});
+
+		const templates = settings.clipTemplates;
+		const fallback = fallbackTemplate(templates);
+		if (fallback === DEFAULT_CLIP_TEMPLATE) {
+			new Setting(containerEl)
+				.setName(`${DEFAULT_CLIP_TEMPLATE.name} (used when no trigger matches)`)
+				.setDesc(
+					`Folder: ${DEFAULT_CLIP_TEMPLATE.path}. Title, source, author, published, created, description and tags. Import a template without triggers to use your own instead.`,
+				);
+		}
+		templates.forEach((template, index) => {
+			const where =
+				template.behavior === "append-daily" || template.behavior === "prepend-daily"
+					? "Adds to today's daily note"
+					: `Folder: ${template.path || "the vault's top level"}`;
+			const triggers = template.triggers?.length ? ` · Triggers: ${template.triggers.join(", ")}` : "";
+			new Setting(containerEl)
+				.setName(template === fallback ? `${template.name} (used when no trigger matches)` : template.name)
+				.setDesc(`${where}${triggers}`)
+				.addExtraButton((button) =>
+					button
+						.setIcon("arrow-up")
+						.setTooltip("Move up")
+						.setDisabled(index === 0)
+						.onClick(() => void this.moveTemplate(index, -1)),
+				)
+				.addExtraButton((button) =>
+					button
+						.setIcon("arrow-down")
+						.setTooltip("Move down")
+						.setDisabled(index === templates.length - 1)
+						.onClick(() => void this.moveTemplate(index, 1)),
+				)
+				.addExtraButton((button) =>
+					button
+						.setIcon("trash")
+						.setTooltip("Remove")
+						.onClick(() => {
+							new ConfirmModal(this.app, `Remove the template “${template.name}”?`, "Remove", async () => {
+								templates.splice(templates.indexOf(template), 1);
+								await this.plugin.savePluginData();
+								this.display();
+							}).open();
+						}),
+				);
+		});
+
+		new Setting(containerEl)
+			.addButton((button) =>
+				button
+					.setButtonText("Import templates…")
+					.setCta()
+					.onClick(() => {
+						const input = createEl("input", { attr: { type: "file", accept: ".json,application/json", multiple: "" } });
+						input.addEventListener("change", async () => {
+							const files = Array.from(input.files ?? []);
+							const texts = await Promise.all(files.map((file) => file.text()));
+							await this.importTemplates(texts);
+						});
+						input.click();
+					}),
+			)
+			.addButton((button) =>
+				button.setButtonText("Paste a template").onClick(() => {
+					new PasteModal(this.app, async (text) => this.importTemplates([text])).open();
+				}),
+			);
+
+		new Setting(containerEl)
+			.setName("Open the note after clipping")
+			.setDesc("Opens the new note in a new tab. Otherwise a message says where it went, with a link to open it.")
+			.addToggle((toggle) =>
+				toggle.setValue(settings.openAfterClip).onChange(async (value) => {
+					settings.openAfterClip = value;
+					await this.plugin.savePluginData();
+				}),
+			);
+	}
+
+	private async importTemplates(texts: string[]): Promise<void> {
+		const added: ClipTemplate[] = [];
+		for (const text of texts) {
+			try {
+				added.push(...parseTemplates(text));
+			} catch (error) {
+				new Notice(`Could not import: ${error instanceof Error ? error.message : String(error)}.`);
+			}
+		}
+		if (!added.length) return;
+		const list = this.plugin.settings.clipTemplates;
+		for (const template of added) {
+			// Importing the same template again replaces it.
+			const same = list.findIndex((t) => t.id === template.id || t.name === template.name);
+			if (same === -1) list.push(template);
+			else list[same] = template;
+		}
+		await this.plugin.savePluginData();
+		new Notice(`Imported ${added.length} ${added.length === 1 ? "template" : "templates"}: ${added.map((t) => t.name).join(", ")}.`);
+		this.display();
+	}
+
+	private async moveTemplate(index: number, step: number): Promise<void> {
+		const list = this.plugin.settings.clipTemplates;
+		const [item] = list.splice(index, 1);
+		list.splice(index + step, 0, item);
+		await this.plugin.savePluginData();
+		this.display();
 	}
 
 	/** A short how-to for adding a magazine, shown above the list. */
@@ -276,7 +480,7 @@ class MagazineModal extends Modal {
 	) {
 		super(app);
 		this.draft = existing
-			? { ...existing, feeds: [...existing.feeds] }
+			? { ...existing, feeds: [...existing.feeds], leaveOut: [...(existing.leaveOut ?? [])] }
 			: {
 					id: `magazine-${Date.now().toString(36)}`,
 					name: "",
@@ -285,6 +489,7 @@ class MagazineModal extends Modal {
 					showAuthor: true,
 					enabled: true,
 					color,
+					leaveOut: [],
 				};
 		this.titleEl.setText(existing ? `Edit ${existing.name}` : "Add a magazine");
 	}
@@ -398,6 +603,21 @@ class MagazineModal extends Modal {
 			);
 		results = contentEl.createDiv({ cls: "magazine-rack-test-results" });
 
+		const leaveOut = new Setting(contentEl)
+			.setName("Leave out")
+			.setDesc("One per line. A word or phrase leaves out articles with it in the headline; anything with a “/” is matched against the web address, such as /podcasts/ or /press-releases/.")
+			.addTextArea((area) => {
+				area.inputEl.rows = 3;
+				area.setPlaceholder("/podcasts/\nnewsletter");
+				area.setValue(draft.leaveOut.join("\n")).onChange((value) => {
+					draft.leaveOut = value
+						.split("\n")
+						.map((line) => line.trim())
+						.filter(Boolean);
+				});
+			});
+		leaveOut.settingEl.addClass("magazine-rack-feeds-setting");
+
 		new Setting(contentEl)
 			.setName("Show authors")
 			.setDesc("Turn off for feeds that name the editor who posted the piece rather than its writer.")
@@ -468,6 +688,41 @@ class ConfirmModal extends Modal {
 						await this.onConfirm();
 					}),
 			);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+class PasteModal extends Modal {
+	constructor(
+		app: App,
+		private readonly onImport: (text: string) => Promise<void>,
+	) {
+		super(app);
+		this.titleEl.setText("Paste a Web Clipper template");
+	}
+
+	onOpen(): void {
+		const { contentEl } = this;
+		contentEl.createEl("p", {
+			cls: "magazine-rack-modal-intro",
+			text: "In Web Clipper's settings, open the template, then More → Copy to clipboard, and paste it here.",
+		});
+		const area = contentEl.createEl("textarea", { cls: "magazine-rack-paste", attr: { rows: "10", spellcheck: "false" } });
+		new Setting(contentEl)
+			.addButton((button) => button.setButtonText("Cancel").onClick(() => this.close()))
+			.addButton((button) =>
+				button
+					.setButtonText("Import")
+					.setCta()
+					.onClick(async () => {
+						this.close();
+						await this.onImport(area.value);
+					}),
+			);
+		window.setTimeout(() => area.focus(), 50);
 	}
 
 	onClose(): void {

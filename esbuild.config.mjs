@@ -16,5 +16,8 @@ esbuild
 		minify: prod,
 		treeShaking: true,
 		outfile: "main.js",
+		banner: {
+			js: "/* Magazine Rack. Includes Defuddle, Knap, Day.js, Turndown and mathml-to-latex, all MIT: see THIRD_PARTY_NOTICES.md */",
+		},
 	})
 	.catch(() => process.exit(1));

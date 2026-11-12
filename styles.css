@@ -37,6 +37,7 @@
 /* ---------- Masthead ---------- */
 
 .mr-masthead {
+	position: relative;
 	text-align: center;
 	padding: 1.2em 0 1em;
 	margin-bottom: 1.1em;
@@ -68,22 +69,50 @@
 	color: var(--mr-muted);
 }
 
-.mr-page button.mr-refresh {
-	padding: 4px;
+.mr-tools {
+	display: flex;
+	flex-wrap: wrap;
+	justify-content: center;
+	gap: 6px;
+	margin-top: 0.7em;
+}
+
+.mr-page button.mr-tool {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
 	height: auto;
+	padding: 4px 11px;
+	border-radius: 999px;
+	border: 1px solid var(--mr-rule);
+	background: transparent;
+	box-shadow: none;
 	color: var(--mr-muted);
+	font: 500 0.74em/1.3 var(--mr-sans);
+	cursor: pointer;
 }
 
-.mr-page button.mr-refresh:hover {
+.mr-page button.mr-tool:hover {
 	color: var(--mr-ink);
+	border-color: color-mix(in srgb, var(--mr-ink) 35%, transparent);
 }
 
-.mr-refresh svg {
-	width: 15px;
-	height: 15px;
+.mr-page button.mr-tool.is-active {
+	background: var(--mr-ink);
+	border-color: var(--mr-ink);
+	color: var(--background-primary);
 }
 
-.mr-refresh.is-spinning svg {
+.mr-tool-icon {
+	display: inline-flex;
+}
+
+.mr-tool-icon svg {
+	width: 14px;
+	height: 14px;
+}
+
+.mr-tool.is-spinning svg {
 	animation: mr-spin 1s linear infinite;
 }
 
@@ -132,6 +161,15 @@
 	background: var(--mr-ink);
 	border-color: var(--mr-ink);
 	color: var(--background-primary);
+}
+
+.mr-chip-icon {
+	display: inline-flex;
+}
+
+.mr-chip-icon svg {
+	width: 13px;
+	height: 13px;
 }
 
 .mr-chip-dot {
@@ -314,6 +352,111 @@
 
 .mr-card.is-read .mr-tag {
 	opacity: 0.8;
+}
+
+/* Buttons on the picture: shown on hover with a mouse; on a touch screen only the menu button. */
+.mr-actions {
+	position: absolute;
+	right: 8px;
+	bottom: 8px;
+	z-index: 2;
+	display: flex;
+	gap: 4px;
+	opacity: 0;
+	transition: opacity 0.15s ease;
+}
+
+.mr-card:hover .mr-actions,
+.mr-card:focus-within .mr-actions {
+	opacity: 1;
+}
+
+.mr-page button.mr-action {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 30px;
+	height: 30px;
+	padding: 0;
+	border: 0;
+	border-radius: 8px;
+	background: rgba(18, 18, 18, 0.62);
+	-webkit-backdrop-filter: blur(6px);
+	backdrop-filter: blur(6px);
+	box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+	color: #fff;
+	cursor: pointer;
+}
+
+.mr-page button.mr-action:hover {
+	background: rgba(0, 0, 0, 0.85);
+}
+
+.mr-page button.mr-action.is-active {
+	background: var(--mr-accent);
+}
+
+.mr-action svg {
+	width: 16px;
+	height: 16px;
+}
+
+@media (hover: none) {
+	.mr-actions {
+		opacity: 1;
+	}
+
+	.mr-actions .mr-action:not(.mr-action-more) {
+		display: none;
+	}
+}
+
+/* The menu button on the label line, for small thumbnails. */
+.mr-page button.mr-more {
+	display: none;
+	margin-left: auto;
+	padding: 0 2px;
+	height: auto;
+	color: var(--mr-faint);
+	opacity: 0;
+}
+
+.mr-compact button.mr-more {
+	display: inline-flex;
+}
+
+.mr-card:hover button.mr-more,
+.mr-card:focus-within button.mr-more {
+	opacity: 1;
+}
+
+@media (hover: none) {
+	.mr-page button.mr-more {
+		opacity: 1;
+		padding: 4px 8px;
+		margin-right: -8px;
+	}
+}
+
+/* Rows (small thumbnail beside the words): the words take the rest of the width, so the menu button sits at the right. */
+.mr-compact .mr-body {
+	flex: 1 1 auto;
+}
+
+.mr-more svg {
+	width: 16px;
+	height: 16px;
+}
+
+.mr-kicker-saved {
+	display: inline-flex;
+	color: var(--interactive-accent);
+}
+
+.mr-kicker-saved svg {
+	width: 12px;
+	height: 12px;
+	fill: currentColor;
 }
 
 /* On wide cards the tag names the magazine, so the label line shows only the time. */
@@ -499,10 +642,43 @@
 	color: var(--mr-ink);
 }
 
-.mr-page a.mr-section-link {
+.mr-section-links {
+	display: flex;
 	flex: none;
+	flex-wrap: wrap;
+	justify-content: flex-end;
+	gap: 0.4em 1.1em;
+}
+
+.mr-page a.mr-section-link {
 	font: 500 0.78em/1.2 var(--mr-sans);
 	color: var(--mr-muted);
+	white-space: nowrap;
+}
+
+.mr-section-icon {
+	display: inline-flex;
+	margin-right: 0.35em;
+	vertical-align: -0.08em;
+	color: var(--interactive-accent);
+}
+
+.mr-section-icon svg {
+	width: 0.8em;
+	height: 0.8em;
+}
+
+.mr-quiet {
+	margin-bottom: 1em;
+	font: italic 0.92em/1.4 var(--mr-serif);
+	color: var(--mr-muted);
+}
+
+.mr-page a.mr-see-all {
+	display: inline-block;
+	margin-top: 1.2em;
+	font: 600 0.8em/1.2 var(--mr-sans);
+	color: var(--interactive-accent);
 }
 
 .mr-page a.mr-section-link:hover {
@@ -616,6 +792,7 @@
 	}
 
 	.mr-grid .mr-card:not(.mr-feature) .mr-body {
+		flex: 1 1 auto;
 		padding-top: 0;
 	}
 
@@ -627,9 +804,14 @@
 		display: none;
 	}
 
-	/* Thumbnails are too small for a tag: the name moves to the label line. */
-	.mr-grid .mr-card:not(.mr-feature) .mr-tag {
+	/* Thumbnails are too small for a tag or buttons: the name moves to the label line, the buttons to its menu. */
+	.mr-grid .mr-card:not(.mr-feature) .mr-tag,
+	.mr-grid .mr-card:not(.mr-feature) .mr-actions {
 		display: none;
+	}
+
+	.mr-page .mr-grid .mr-card:not(.mr-feature) button.mr-more {
+		display: inline-flex;
 	}
 
 	.mr-grid .mr-card:not(.mr-feature) .mr-kicker-name.is-tagged {
@@ -640,6 +822,18 @@
 		content: "·";
 		margin-left: 0.6em;
 	}
+}
+
+/* In editing view the page should still look like a page, not a code block being edited. */
+.markdown-source-view.magazine-rack-page .cm-embed-block.cm-lang-magazine-rack {
+	box-shadow: none;
+	background: transparent;
+}
+
+.magazine-rack-paste {
+	width: 100%;
+	font-family: var(--font-monospace);
+	font-size: var(--font-ui-smaller);
 }
 
 .mr-empty {
@@ -661,7 +855,108 @@
 	}
 }
 
+/* The support heart: small and quiet in the masthead's corner, warmer on hover. */
+.mr-page a.mr-support {
+	position: absolute;
+	right: 2px;
+	bottom: 10px;
+	display: inline-flex;
+	padding: 4px;
+	border-radius: 999px;
+	color: var(--mr-faint);
+	opacity: 0.45;
+	transition:
+		opacity 0.2s ease,
+		color 0.2s ease;
+}
+
+.mr-page a.mr-support:hover,
+.mr-page a.mr-support:focus-visible {
+	opacity: 1;
+	color: var(--color-red);
+}
+
+.mr-support svg {
+	width: 14px;
+	height: 14px;
+}
+
+.mr-page a.mr-support:hover svg {
+	fill: currentColor;
+}
+
 /* ---------- Settings ---------- */
+
+.setting-item.magazine-rack-support {
+	display: flex;
+	align-items: center;
+	gap: var(--size-4-4);
+}
+
+.magazine-rack-support-icon {
+	display: inline-flex;
+	flex: none;
+	color: var(--color-red);
+}
+
+.magazine-rack-support-icon svg {
+	width: var(--icon-l);
+	height: var(--icon-l);
+	fill: currentColor;
+}
+
+.magazine-rack-support-text {
+	flex: 1;
+	min-width: 0;
+}
+
+.magazine-rack-support-title {
+	color: var(--text-normal);
+	font-weight: var(--font-semibold);
+}
+
+.magazine-rack-support-text p {
+	margin: var(--size-2-1) 0 0;
+	color: var(--text-muted);
+	font-size: var(--font-ui-small);
+	line-height: var(--line-height-tight);
+}
+
+.magazine-rack-support-nowrap {
+	white-space: nowrap;
+}
+
+.magazine-rack-support-button {
+	display: inline-flex;
+	flex: none;
+	align-items: center;
+	gap: var(--size-4-2);
+	padding: var(--size-4-2) var(--size-4-4);
+	border-radius: var(--radius-m);
+	background-color: var(--interactive-accent);
+	color: var(--text-on-accent);
+	font-weight: var(--font-semibold);
+	text-decoration: none;
+	white-space: nowrap;
+}
+
+.magazine-rack-support-button:hover {
+	background-color: var(--interactive-accent-hover);
+	color: var(--text-on-accent);
+}
+
+.magazine-rack-support-button-icon {
+	display: inline-flex;
+}
+
+.magazine-rack-support-button-icon svg {
+	width: var(--icon-s);
+	height: var(--icon-s);
+}
+
+.is-phone .setting-item.magazine-rack-support {
+	flex-wrap: wrap;
+}
 
 .magazine-rack-swatch {
 	display: inline-block;

@@ -245,7 +245,7 @@ function summarise(html: string): string | undefined {
 	return `${(space > 150 ? cut.slice(0, space) : cut).replace(/[\s,;:.]+$/, "")}…`;
 }
 
-function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
 	return new Promise<T>((resolve, reject) => {
 		const timer = window.setTimeout(() => reject(new Error("no answer after 30 seconds")), ms);
 		promise.then(

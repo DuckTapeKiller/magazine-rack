@@ -4,6 +4,8 @@
 	"version": "1.0.0",
 	"minAppVersion": "1.4.0",
 	"description": "A front page for the magazines you read: their latest articles, with pictures, in one note that keeps itself up to date.",
-	"author": "CasaAmarillaRoja",
-	"isDesktopOnly": false
+	"author": "DuckTapeKiller",
+	"isDesktopOnly": false,
+	"authorUrl": "https://github.com/DuckTapeKiller",
+	"fundingUrl": "https://ko-fi.com/ducktapekiller"
 }

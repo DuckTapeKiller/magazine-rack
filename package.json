@@ -14,5 +14,9 @@
 		"obsidian": "latest",
 		"tslib": "2.4.0",
 		"typescript": "4.9.5"
+	},
+	"dependencies": {
+		"defuddle": "^0.19.6",
+		"knap": "^0.6.0"
 	}
 }

@@ -10,8 +10,22 @@
 		"importHelpers": true,
 		"isolatedModules": true,
 		"useUnknownInCatchVariables": true,
-		"lib": ["DOM", "DOM.Iterable", "ES2021"],
-		"types": []
+		"lib": [
+			"DOM",
+			"DOM.Iterable",
+			"ES2021"
+		],
+		"types": [],
+		"paths": {
+			"defuddle/full": [
+				"node_modules/defuddle/dist/index.full.d.ts"
+			],
+			"knap/html": [
+				"node_modules/knap/dist/html.d.ts"
+			]
+		}
 	},
-	"include": ["src/**/*.ts"]
+	"include": [
+		"src/**/*.ts"
+	]
 }

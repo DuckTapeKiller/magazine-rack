@@ -1,15 +1,27 @@
-import { MarkdownRenderChild, setIcon } from "obsidian";
+import { MarkdownRenderChild, Menu, Notice, setIcon } from "obsidian";
+import type { Strings } from "./i18n";
 import type MagazineRack from "./main";
-import type { Article, Magazine } from "./types";
+import { KOFI_URL, type Article, type Magazine } from "./types";
 
 const HOUR = 60 * 60 * 1000;
 const DAY = 24 * HOUR;
 /** How many of the newest pieces across all magazines open the page. */
 const JUST_IN = 5;
+/** Saved pieces shown on the whole page; the Saved chip shows them all. */
+const SAVED_PREVIEW = 8;
+const SAVED = "__saved__";
+
+/** What a card needs to know about where its article comes from. */
+interface Source {
+	id: string;
+	name: string;
+	color: string;
+	showAuthor: boolean;
+}
 
 interface Entry {
 	article: Article;
-	magazine: Magazine;
+	source: Source;
 }
 
 type Variant = "hero" | "feature" | "card" | "compact";
@@ -43,8 +55,11 @@ export function parseOptions(source: string): BlockOptions {
 
 /** The front page drawn wherever a ```magazine-rack block appears. */
 export class FrontPage extends MarkdownRenderChild {
-	/** The magazine the reader is focused on, or null for the whole page. */
+	/** The magazine the reader is focused on, SAVED for the saved list, or null for the whole page. */
 	private focus: string | null = null;
+	private t!: Strings;
+	private now = 0;
+	private leaveOutRules = new Map<string, ((article: Article) => boolean)[]>();
 
 	constructor(
 		containerEl: HTMLElement,
@@ -67,81 +82,106 @@ export class FrontPage extends MarkdownRenderChild {
 		const root = this.containerEl;
 		root.empty();
 		root.addClass("mr-page");
+		this.t = this.plugin.t();
+		this.now = Date.now();
+		this.leaveOutRules.clear();
 
 		const magazines = this.magazines();
-		if (this.focus && !magazines.some((m) => m.id === this.focus)) this.focus = null;
-		const now = Date.now();
+		if (this.focus && this.focus !== SAVED && !magazines.some((m) => m.id === this.focus)) this.focus = null;
+		if (this.focus === SAVED && !this.plugin.saved.length) this.focus = null;
 
-		this.masthead(root, magazines, now);
-		if (magazines.length > 1) this.chips(root, magazines, now);
+		this.masthead(root, magazines);
+		if (magazines.length > 1 || this.plugin.saved.length) this.chips(root, magazines);
 
+		if (this.focus === SAVED) {
+			this.savedSection(root, true);
+			return;
+		}
 		const shown = this.focus ? magazines.filter((m) => m.id === this.focus) : magazines;
-		const anything = shown.some((m) => this.articles(m).length);
+		const anything = shown.some((m) => this.allArticles(m).length) || (!this.focus && this.plugin.saved.length > 0);
 		if (!anything) {
 			this.emptyState(root);
 			return;
 		}
-		if (!this.focus && magazines.length > 1) this.justIn(root, magazines, now);
-		for (const magazine of shown) this.section(root, magazine, now);
+		if (!this.focus && magazines.length > 1) this.justIn(root, magazines);
+		if (!this.focus && this.plugin.saved.length) this.savedSection(root, false);
+		for (const magazine of shown) this.section(root, magazine);
 	}
 
-	// ---- parts of the page ----
+	// ---------- parts of the page ----------
 
-	private masthead(root: HTMLElement, magazines: Magazine[], now: number): void {
+	private masthead(root: HTMLElement, magazines: Magazine[]): void {
+		const t = this.t;
 		const head = root.createDiv({ cls: "mr-masthead" });
+		head.createDiv({ cls: "mr-dateline", text: t.dateline(this.now) });
 		head.createDiv({
-			cls: "mr-dateline",
-			text: [
-				new Date(now).toLocaleDateString("en-GB", { weekday: "long" }),
-				new Date(now).toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }),
-			].join(" "),
+			cls: "mr-title",
+			text: this.plugin.settings.title || "The Reading Room",
+			attr: { role: "heading", "aria-level": "1" },
 		});
-		head.createDiv({ cls: "mr-title", text: this.plugin.settings.title || "The Reading Room", attr: { role: "heading", "aria-level": "1" } });
 
 		const status = head.createDiv({ cls: "mr-status" });
-		const fresh = magazines.flatMap((m) => this.articles(m)).filter((a) => this.isNew(a, now)).length;
-		const bits = [
-			`${magazines.length} ${magazines.length === 1 ? "magazine" : "magazines"}`,
-			fresh ? `${fresh} new today` : "nothing new today",
-		];
-		if (this.plugin.lastCheck) bits.push(`updated ${clock(this.plugin.lastCheck, now)}`);
+		const fresh = magazines.flatMap((m) => this.visible(m)).filter((a) => this.isNew(a)).length;
+		const bits = [t.magazines(magazines.length), t.newToday(fresh)];
+		if (this.plugin.lastCheck) bits.push(t.updated(t.clock(this.plugin.lastCheck, this.now)));
 		status.createSpan({ text: bits.join(" · ") });
 
-		const button = status.createEl("button", { cls: "mr-refresh clickable-icon", attr: { "aria-label": "Check for new articles" } });
-		setIcon(button, "refresh-cw");
-		if (this.plugin.isChecking()) button.addClass("is-spinning");
-		button.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
-			button.addClass("is-spinning");
+		const tools = head.createDiv({ cls: "mr-tools" });
+		const refresh = this.toolButton(tools, "refresh-cw", t.checkForNew);
+		if (this.plugin.isChecking()) refresh.addClass("is-spinning");
+		this.onPress(refresh, () => {
+			refresh.addClass("is-spinning");
 			void this.plugin.checkNow(false);
 		});
+
+		const unread = this.toolButton(tools, this.plugin.settings.unreadOnly ? "eye-off" : "eye", t.unreadOnly, true);
+		unread.toggleClass("is-active", this.plugin.settings.unreadOnly);
+		unread.setAttr("aria-pressed", String(this.plugin.settings.unreadOnly));
+		this.onPress(unread, () => {
+			this.plugin.settings.unreadOnly = !this.plugin.settings.unreadOnly;
+			void this.plugin.savePluginData();
+			this.plugin.refreshViews();
+		});
+
+		const allRead = this.toolButton(tools, "check-check", t.markAllRead, true);
+		this.onPress(allRead, () => this.markAllRead(this.scopeForMarkAll(magazines)));
+
+		// A quiet way to support the plugin, tucked into the masthead's corner.
+		const heart = head.createEl("a", { cls: "mr-support", href: KOFI_URL, attr: { "aria-label": t.support } });
+		setIcon(heart, "heart");
+		this.openOnClick(heart, KOFI_URL);
 	}
 
-	private chips(root: HTMLElement, magazines: Magazine[], now: number): void {
+	private chips(root: HTMLElement, magazines: Magazine[]): void {
 		const nav = root.createDiv({ cls: "mr-chips", attr: { role: "tablist" } });
-		const chip = (label: string, id: string | null, magazine?: Magazine) => {
+		const chip = (
+			label: string,
+			id: string | null,
+			options: { color?: string; accent?: string; icon?: string; count?: number } = {},
+		) => {
 			const el = nav.createEl("button", { cls: "mr-chip", attr: { role: "tab" } });
-			if (this.focus === id) el.addClass("is-active");
+			el.toggleClass("is-active", this.focus === id);
 			el.setAttr("aria-selected", String(this.focus === id));
-			if (magazine) {
-				el.style.setProperty("--mr-accent", magazine.color);
-				el.createSpan({ cls: "mr-chip-dot" });
-			}
+			if (options.color || options.accent) el.style.setProperty("--mr-accent", options.color ?? options.accent ?? "");
+			if (options.color) el.createSpan({ cls: "mr-chip-dot" });
+			if (options.icon) setIcon(el.createSpan({ cls: "mr-chip-icon" }), options.icon);
 			el.createSpan({ text: label });
-			if (magazine) {
-				const fresh = this.articles(magazine).filter((a) => this.isNew(a, now)).length;
-				if (fresh) el.createSpan({ cls: "mr-chip-count", text: String(fresh) });
-			}
-			el.addEventListener("click", (event) => {
-				event.preventDefault();
-				event.stopPropagation();
+			if (options.count) el.createSpan({ cls: "mr-chip-count", text: String(options.count) });
+			this.onPress(el, () => {
 				this.focus = this.focus === id ? null : id;
 				this.render();
 			});
 		};
-		chip("Everything", null);
-		for (const magazine of magazines) chip(shortName(magazine.name), magazine.id, magazine);
+		chip(this.t.everything, null);
+		if (this.plugin.saved.length) {
+			chip(this.t.saved, SAVED, { icon: "bookmark", accent: "var(--interactive-accent)", count: this.savedEntries().length });
+		}
+		for (const magazine of magazines) {
+			chip(shortName(magazine.name), magazine.id, {
+				color: magazine.color,
+				count: this.visible(magazine).filter((a) => this.isNew(a)).length,
+			});
+		}
 		// On a phone the row scrolls sideways: bring the chosen chip into view.
 		window.requestAnimationFrame(() => {
 			const active = nav.querySelector<HTMLElement>(".mr-chip.is-active");
@@ -151,30 +191,77 @@ export class FrontPage extends MarkdownRenderChild {
 		});
 	}
 
-	private justIn(root: HTMLElement, magazines: Magazine[], now: number): void {
+	private justIn(root: HTMLElement, magazines: Magazine[]): void {
 		const entries = magazines
-			.flatMap((magazine) => this.articles(magazine).map((article) => ({ article, magazine })))
-			.filter((e) => e.article.date !== undefined && e.article.date <= now + HOUR)
+			.flatMap((magazine) => this.visible(magazine).map((article) => ({ article, source: sourceOf(magazine) })))
+			.filter((e) => e.article.date !== undefined && e.article.date <= this.now + HOUR)
 			.sort((a, b) => (b.article.date ?? 0) - (a.article.date ?? 0))
 			.slice(0, JUST_IN);
 		if (!entries.length) return;
 
 		const section = root.createDiv({ cls: "mr-justin" });
-		section.createDiv({ cls: "mr-label", text: "Just in" });
+		section.createDiv({ cls: "mr-label", text: this.t.justIn });
 		const layout = section.createDiv({ cls: "mr-justin-layout" });
-		this.card(layout, entries[0], "hero", now);
+		this.card(layout, entries[0], "hero", false);
 		const side = layout.createDiv({ cls: "mr-justin-side" });
-		for (const entry of entries.slice(1)) this.card(side, entry, "compact", now);
+		for (const entry of entries.slice(1)) this.card(side, entry, "compact", false);
 	}
 
-	private section(root: HTMLElement, magazine: Magazine, now: number): void {
+	private savedSection(root: HTMLElement, all: boolean): void {
+		const entries = this.savedEntries();
+		const section = root.createDiv({ cls: "mr-section mr-saved" });
+		section.style.setProperty("--mr-accent", "var(--interactive-accent)");
+		const head = section.createDiv({ cls: "mr-section-head" });
+		const name = head.createDiv({ cls: "mr-section-name", attr: { role: "heading", "aria-level": "2" } });
+		setIcon(name.createSpan({ cls: "mr-section-icon" }), "bookmark");
+		name.appendText(this.t.savedForLater);
+		const links = head.createDiv({ cls: "mr-section-links" });
+		if (entries.some((e) => !this.plugin.isRead(e.article.url))) {
+			const mark = links.createEl("a", { cls: "mr-section-link", href: "#", text: this.t.markAllRead });
+			this.onPress(mark, () => this.markAllRead(entries.map((e) => e.article.url)));
+		}
+
+		if (!entries.length) {
+			section.createDiv({
+				cls: "mr-quiet",
+				text: this.plugin.saved.length ? this.t.allCaughtUp : this.t.nothingSaved,
+			});
+			return;
+		}
+		const shown = all ? entries : entries.slice(0, SAVED_PREVIEW);
+		const grid = section.createDiv({ cls: "mr-grid" });
+		for (const entry of shown) this.card(grid, entry, "card", true);
+		if (!all && entries.length > shown.length) {
+			const more = section.createEl("a", {
+				cls: "mr-see-all",
+				href: "#",
+				text: `${this.t.saved} (${entries.length}) →`,
+			});
+			this.onPress(more, () => {
+				this.focus = SAVED;
+				this.render();
+			});
+		}
+	}
+
+	private section(root: HTMLElement, magazine: Magazine): void {
+		const t = this.t;
 		const section = root.createDiv({ cls: "mr-section" });
 		section.style.setProperty("--mr-accent", magazine.color);
 
 		const head = section.createDiv({ cls: "mr-section-head" });
 		head.createDiv({ cls: "mr-section-name", text: magazine.name, attr: { role: "heading", "aria-level": "2" } });
+		const links = head.createDiv({ cls: "mr-section-links" });
+
+		const cache = this.plugin.cache[magazine.id];
+		const limit = this.focus ? Infinity : this.options.articles ?? this.plugin.settings.perMagazine;
+		const articles = this.visible(magazine).slice(0, limit);
+		if (articles.some((a) => !this.plugin.isRead(a.url))) {
+			const mark = links.createEl("a", { cls: "mr-section-link", href: "#", text: t.markAllRead });
+			this.onPress(mark, () => this.markAllRead(this.visible(magazine).map((a) => a.url)));
+		}
 		if (magazine.homepage) {
-			const link = head.createEl("a", {
+			const link = links.createEl("a", {
 				cls: "mr-section-link",
 				href: magazine.homepage,
 				text: `${hostName(magazine.homepage)} ↗`,
@@ -182,48 +269,57 @@ export class FrontPage extends MarkdownRenderChild {
 			this.openOnClick(link, magazine.homepage);
 		}
 
-		const cache = this.plugin.cache[magazine.id];
-		const limit = this.focus ? 30 : this.options.articles ?? this.plugin.settings.perMagazine;
-		const articles = this.articles(magazine).slice(0, limit);
 		if (cache?.error) {
+			const kept = this.allArticles(magazine).length;
 			section.createDiv({
 				cls: "mr-warning",
-				text: articles.length
-					? `The last check could not reach this magazine (${cache.error}), so these are from ${clock(cache.fetchedAt ?? now, now)}.`
-					: `This magazine's feed could not be read (${cache.error}).`,
+				text: kept
+					? t.lastCheckFailed(cache.error, cache.fetchedAt ?? this.now, this.now)
+					: t.feedUnreadable(cache.error),
 			});
-		} else if (!articles.length) {
-			section.createDiv({ cls: "mr-warning", text: cache ? "The feed has no articles at the moment." : "Not checked yet." });
+		} else if (!cache) {
+			section.createDiv({ cls: "mr-quiet", text: t.notChecked });
+		} else if (!this.allArticles(magazine).length) {
+			section.createDiv({ cls: "mr-quiet", text: t.feedEmpty });
 		}
-		if (!articles.length) return;
+		if (!articles.length) {
+			if (this.allArticles(magazine).length) section.createDiv({ cls: "mr-quiet", text: t.allCaughtUp });
+			return;
+		}
 
 		const grid = section.createDiv({ cls: "mr-grid" });
-		articles.forEach((article, i) => this.card(grid, { article, magazine }, i === 0 ? "feature" : "card", now));
+		const source = sourceOf(magazine);
+		articles.forEach((article, i) => this.card(grid, { article, source }, i === 0 ? "feature" : "card", false));
 	}
 
 	private emptyState(root: HTMLElement): void {
 		const box = root.createDiv({ cls: "mr-empty" });
-		if (this.plugin.isChecking()) {
-			box.setText("Fetching the latest articles…");
-		} else if (!this.magazines().length) {
-			box.setText("No magazines are switched on. Choose them in the plugin's settings.");
-		} else {
-			box.setText("Nothing here yet. Press the refresh button above to fetch the latest articles.");
-		}
+		if (this.plugin.isChecking()) box.setText(this.t.fetching);
+		else if (!this.magazines().length) box.setText(this.t.noMagazines);
+		else if (this.plugin.settings.unreadOnly) box.setText(this.t.allCaughtUp);
+		else box.setText(this.t.nothingYet);
 	}
 
-	// ---- one article ----
+	// ---------- one article ----------
 
-	private card(parent: HTMLElement, entry: Entry, variant: Variant, now: number): void {
-		const { article, magazine } = entry;
+	private card(parent: HTMLElement, entry: Entry, variant: Variant, inSaved: boolean): void {
+		const { article, source } = entry;
+		const t = this.t;
 		const card = parent.createEl("a", { cls: `mr-card mr-${variant}`, href: article.url });
-		card.style.setProperty("--mr-accent", magazine.color);
+		card.style.setProperty("--mr-accent", source.color);
 		const read = this.plugin.isRead(article.url);
-		if (read) card.addClass("is-read");
+		const saved = this.plugin.isSaved(article.url);
+		card.toggleClass("is-read", read);
+		card.toggleClass("is-saved", saved);
 		this.openOnClick(card, article.url, () => {
-			this.plugin.markRead(article.url);
+			this.plugin.setRead(article.url, true);
 			card.addClass("is-read");
 			card.querySelector(".mr-new")?.remove();
+		});
+		card.addEventListener("contextmenu", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			this.menu(entry, inSaved).showAtMouseEvent(event);
 		});
 
 		const media = card.createDiv({ cls: "mr-media" });
@@ -240,22 +336,31 @@ export class FrontPage extends MarkdownRenderChild {
 			});
 			img.addEventListener("error", () => {
 				img.remove();
-				this.monogram(media, magazine);
+				this.monogram(media, source);
 			});
 		} else {
-			this.monogram(media, magazine);
+			this.monogram(media, source);
 		}
+
 		// Every card with a full-size picture names its magazine on the picture.
 		const tagged = variant !== "compact";
-		if (tagged) media.createDiv({ cls: "mr-tag", text: shortName(magazine.name) });
+		if (tagged) media.createDiv({ cls: "mr-tag", text: shortName(source.name) });
+		if (tagged) this.actions(media, entry, inSaved);
 
 		const body = card.createDiv({ cls: "mr-body" });
-		const when = article.date !== undefined ? relativeTime(article.date, now) : "";
+		const when = article.date !== undefined ? t.relative(article.date, this.now) : "";
 		const kicker = body.createDiv({ cls: "mr-kicker" });
 		// Where the picture carries the tag, the label line gives the time; the name stays for narrow rows.
-		kicker.createSpan({ cls: tagged ? "mr-kicker-name is-tagged" : "mr-kicker-name", text: shortName(magazine.name) });
+		kicker.createSpan({ cls: tagged ? "mr-kicker-name is-tagged" : "mr-kicker-name", text: shortName(source.name) });
 		if (tagged && when) kicker.createSpan({ cls: "mr-kicker-time", text: when });
-		if (!read && this.isNew(article, now)) kicker.createSpan({ cls: "mr-new", text: "New" });
+		if (!read && this.isNew(article)) kicker.createSpan({ cls: "mr-new", text: t.newBadge });
+		if (saved) {
+			const mark = kicker.createSpan({ cls: "mr-kicker-saved", attr: { "aria-label": t.savedMark } });
+			setIcon(mark, "bookmark");
+		}
+		const more = kicker.createEl("button", { cls: "mr-more clickable-icon", attr: { "aria-label": t.moreActions } });
+		setIcon(more, "more-horizontal");
+		this.onPress(more, (event) => this.menu(entry, inSaved).showAtMouseEvent(event));
 
 		body.createDiv({ cls: "mr-headline", text: article.title });
 		if (this.plugin.settings.showSummaries && article.summary && variant !== "compact") {
@@ -263,29 +368,169 @@ export class FrontPage extends MarkdownRenderChild {
 		}
 
 		const meta: string[] = [];
-		if (magazine.showAuthor && article.author) meta.push(shortByline(article.author));
+		if (source.showAuthor && article.author) meta.push(shortByline(article.author, t));
 		if (when && !tagged) meta.push(when);
 		const metaEl = body.createDiv({ cls: "mr-meta" });
 		for (const item of meta) metaEl.createSpan({ cls: "mr-meta-item", text: item });
-		metaEl.createSpan({ cls: "mr-read-mark", text: "Read" });
+		metaEl.createSpan({ cls: "mr-read-mark", text: t.readMark });
 	}
 
-	private monogram(media: HTMLElement, magazine: Magazine): void {
+	/** Buttons on the picture: on hover with a mouse, the menu button alone on a touch screen. */
+	private actions(media: HTMLElement, entry: Entry, inSaved: boolean): void {
+		const t = this.t;
+		const url = entry.article.url;
+		const bar = media.createDiv({ cls: "mr-actions" });
+		const saved = this.plugin.isSaved(url);
+		const read = this.plugin.isRead(url);
+
+		const save = this.actionButton(bar, saved ? "bookmark-check" : "bookmark", saved ? t.unsave : t.saveForLater);
+		save.toggleClass("is-active", saved);
+		this.onPress(save, () => this.toggleSaved(entry));
+
+		const readButton = this.actionButton(bar, "check", read ? t.markUnread : t.markRead);
+		readButton.toggleClass("is-active", read);
+		this.onPress(readButton, () => {
+			this.plugin.setRead(url, !read);
+			this.plugin.refreshViews();
+		});
+
+		const clip = this.actionButton(bar, "scissors", t.clipToVault);
+		this.onPress(clip, () => void this.plugin.clip(entry.article));
+
+		const remove = this.actionButton(bar, "x", inSaved ? t.removeFromSaved : t.removeFromPage);
+		this.onPress(remove, () => (inSaved ? this.toggleSaved(entry) : this.remove(entry)));
+
+		const more = this.actionButton(bar, "more-horizontal", t.moreActions);
+		more.addClass("mr-action-more");
+		this.onPress(more, (event) => this.menu(entry, inSaved).showAtMouseEvent(event));
+	}
+
+	private menu(entry: Entry, inSaved: boolean): Menu {
+		const t = this.t;
+		const url = entry.article.url;
+		const saved = this.plugin.isSaved(url);
+		const read = this.plugin.isRead(url);
+		const menu = new Menu();
+		menu.addItem((item) =>
+			item
+				.setTitle(saved ? t.unsave : t.saveForLater)
+				.setIcon(saved ? "bookmark-minus" : "bookmark")
+				.onClick(() => this.toggleSaved(entry)),
+		);
+		menu.addItem((item) =>
+			item
+				.setTitle(read ? t.markUnread : t.markRead)
+				.setIcon(read ? "circle" : "check")
+				.onClick(() => {
+					this.plugin.setRead(url, !read);
+					this.plugin.refreshViews();
+				}),
+		);
+		if (!inSaved) {
+			menu.addItem((item) => item.setTitle(t.removeFromPage).setIcon("x").onClick(() => this.remove(entry)));
+		}
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t.clipToVault)
+				.setIcon("scissors")
+				.onClick(() => void this.plugin.clip(entry.article)),
+		);
+		const templates = this.plugin.settings.clipTemplates;
+		if (templates.length > 1) {
+			for (const template of templates) {
+				menu.addItem((item) =>
+					item
+						.setTitle(t.clipWith(template.name))
+						.setIcon("file-plus")
+						.onClick(() => void this.plugin.clip(entry.article, template)),
+				);
+			}
+		}
+		menu.addSeparator();
+		menu.addItem((item) =>
+			item
+				.setTitle(t.copyLink)
+				.setIcon("link")
+				.onClick(() => {
+					void navigator.clipboard.writeText(url).then(() => new Notice(t.linkCopied));
+				}),
+		);
+		return menu;
+	}
+
+	// ---------- what the actions do ----------
+
+	private toggleSaved(entry: Entry): void {
+		const t = this.t;
+		const url = entry.article.url;
+		if (this.plugin.isSaved(url)) {
+			const removed = this.plugin.unsave(url);
+			this.plugin.refreshViews();
+			if (removed) this.plugin.notifyWithUndo(t.unsavedNotice, () => this.plugin.restoreSaved(removed));
+			return;
+		}
+		this.plugin.save(entry.article, entry.source);
+		this.plugin.refreshViews();
+		this.plugin.notifyWithUndo(t.savedNotice, () => void this.plugin.unsave(url));
+	}
+
+	private remove(entry: Entry): void {
+		const url = entry.article.url;
+		this.plugin.setRemoved(url, true);
+		this.plugin.refreshViews();
+		this.plugin.notifyWithUndo(this.t.removedNotice, () => this.plugin.setRemoved(url, false));
+	}
+
+	private markAllRead(urls: string[]): void {
+		const changed = this.plugin.markAllRead(urls);
+		this.plugin.refreshViews();
+		if (changed.length) this.plugin.notifyWithUndo(this.t.markedAllRead(changed.length), () => this.plugin.unmarkRead(changed));
+	}
+
+	/** What "Mark all as read" in the masthead covers: what the page is showing. */
+	private scopeForMarkAll(magazines: Magazine[]): string[] {
+		if (this.focus === SAVED) return this.savedEntries().map((e) => e.article.url);
+		const shown = this.focus ? magazines.filter((m) => m.id === this.focus) : magazines;
+		return shown.flatMap((m) => this.visible(m).map((a) => a.url));
+	}
+
+	// ---------- small pieces ----------
+
+	private monogram(media: HTMLElement, source: Source): void {
 		media.addClass("is-monogram");
-		media.createDiv({ cls: "mr-monogram", text: initials(magazine.name) });
+		media.createDiv({ cls: "mr-monogram", text: initials(source.name) });
+	}
+
+	private toolButton(parent: HTMLElement, icon: string, label: string, withText = false): HTMLElement {
+		const button = parent.createEl("button", { cls: "mr-tool", attr: { "aria-label": label } });
+		setIcon(button.createSpan({ cls: "mr-tool-icon" }), icon);
+		if (withText) button.createSpan({ cls: "mr-tool-text", text: label });
+		return button;
+	}
+
+	private actionButton(parent: HTMLElement, icon: string, label: string): HTMLElement {
+		const button = parent.createEl("button", { cls: "mr-action", attr: { "aria-label": label } });
+		setIcon(button, icon);
+		return button;
+	}
+
+	/** A click that does its job and nothing else: no link opened, no cursor put into the editor. */
+	private onPress(el: HTMLElement, action: (event: MouseEvent) => void): void {
+		el.addEventListener("click", (event) => {
+			event.preventDefault();
+			event.stopPropagation();
+			action(event);
+		});
 	}
 
 	/** Opens in the browser, and stops the click from putting the editor's cursor into the block. */
 	private openOnClick(el: HTMLElement, url: string, after?: () => void): void {
-		el.addEventListener("click", (event) => {
-			event.preventDefault();
-			event.stopPropagation();
+		this.onPress(el, () => {
 			window.open(url);
 			after?.();
 		});
 	}
-
-	// ---- helpers ----
 
 	private magazines(): Magazine[] {
 		const wanted = this.options.magazines;
@@ -297,13 +542,58 @@ export class FrontPage extends MarkdownRenderChild {
 		);
 	}
 
-	private articles(magazine: Magazine): Article[] {
-		return this.plugin.cache[magazine.id]?.articles ?? [];
+	/** Everything kept for a magazine, apart from what was removed or left out. */
+	private allArticles(magazine: Magazine): Article[] {
+		const rules = this.rulesFor(magazine);
+		return (this.plugin.cache[magazine.id]?.articles ?? []).filter(
+			(a) => !this.plugin.isRemoved(a.url) && !rules.some((rule) => rule(a)),
+		);
 	}
 
-	private isNew(article: Article, now: number): boolean {
-		return article.date !== undefined && now - article.date < DAY && !this.plugin.isRead(article.url);
+	/** What the page shows for a magazine: as above, and only unread pieces when that is switched on. */
+	private visible(magazine: Magazine): Article[] {
+		const all = this.allArticles(magazine);
+		return this.plugin.settings.unreadOnly ? all.filter((a) => !this.plugin.isRead(a.url)) : all;
 	}
+
+	private savedEntries(): Entry[] {
+		return this.plugin.saved
+			.filter((s) => !this.plugin.settings.unreadOnly || !this.plugin.isRead(s.article.url))
+			.map((s) => {
+				const magazine = this.plugin.settings.magazines.find((m) => m.id === s.magazineId);
+				return {
+					article: s.article,
+					source: magazine ? sourceOf(magazine) : { id: s.magazineId, name: s.magazineName, color: s.color, showAuthor: true },
+				};
+			});
+	}
+
+	private rulesFor(magazine: Magazine): ((article: Article) => boolean)[] {
+		let rules = this.leaveOutRules.get(magazine.id);
+		if (!rules) {
+			rules = (magazine.leaveOut ?? []).map(leaveOutRule).filter((r): r is (a: Article) => boolean => !!r);
+			this.leaveOutRules.set(magazine.id, rules);
+		}
+		return rules;
+	}
+
+	private isNew(article: Article): boolean {
+		return article.date !== undefined && this.now - article.date < DAY && !this.plugin.isRead(article.url);
+	}
+}
+
+/** "/podcasts/" matches the web address; anything else matches whole words in the headline. */
+export function leaveOutRule(rule: string): ((article: Article) => boolean) | null {
+	const text = rule.trim().toLowerCase();
+	if (!text) return null;
+	if (text.includes("/")) return (article) => article.url.toLowerCase().includes(text);
+	const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+	const pattern = new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}($|[^\\p{L}\\p{N}])`, "iu");
+	return (article) => pattern.test(article.title);
+}
+
+function sourceOf(magazine: Magazine): Source {
+	return { id: magazine.id, name: magazine.name, color: magazine.color, showAuthor: magazine.showAuthor };
 }
 
 function shortName(name: string): string {
@@ -311,9 +601,9 @@ function shortName(name: string): string {
 }
 
 /** "A, B, C and D" becomes "A and others", so a long byline stays on one line. */
-function shortByline(author: string): string {
-	const people = author.split(/\s*,\s*|\s+and\s+|\s*&\s*/).filter(Boolean);
-	return people.length > 2 ? `${people[0]} and others` : author;
+function shortByline(author: string, t: Strings): string {
+	const people = author.split(/\s*,\s*|\s+and\s+|\s+y\s+|\s*&\s*/).filter(Boolean);
+	return people.length > 2 ? t.andOthers(people[0]) : author;
 }
 
 function initials(name: string): string {
@@ -332,37 +622,6 @@ function hostName(url: string): string {
 	} catch {
 		return url;
 	}
-}
-
-function clock(time: number, now: number): string {
-	const date = new Date(time);
-	const hm = date.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-	if (new Date(now).toDateString() === date.toDateString()) return `at ${hm}`;
-	return `${date.toLocaleDateString("en-GB", { day: "numeric", month: "short" })} at ${hm}`;
-}
-
-export function relativeTime(time: number, now: number): string {
-	const diff = now - time;
-	if (diff < 0) return "just now";
-	if (diff < HOUR) {
-		const minutes = Math.max(1, Math.round(diff / 60000));
-		return `${minutes} ${minutes === 1 ? "minute" : "minutes"} ago`;
-	}
-	if (diff < DAY) {
-		const hours = Math.round(diff / HOUR);
-		return `${hours} ${hours === 1 ? "hour" : "hours"} ago`;
-	}
-	const date = new Date(time);
-	const today = new Date(now);
-	today.setHours(0, 0, 0, 0);
-	const days = Math.ceil((today.getTime() - date.getTime()) / DAY);
-	if (days <= 1) return "yesterday";
-	if (days < 7) return date.toLocaleDateString("en-GB", { weekday: "long" });
-	const sameYear = date.getFullYear() === today.getFullYear();
-	return date.toLocaleDateString(
-		"en-GB",
-		sameYear ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" },
-	);
 }
 
 export function formatStamp(time: number): string {
